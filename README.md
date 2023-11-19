@@ -12,3 +12,4 @@
 # <img src="README.assets/RV32I.png" width="500" align=center /> 
 
 ### 框架草图
+# <img src="README.assets/cpu框架.png" width="500" align=center /> 
