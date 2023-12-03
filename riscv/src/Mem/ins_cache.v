@@ -5,7 +5,7 @@ module ICache (
     input wire Sys_rst,
     input wire Sys_rdy,
 
-    //MC
+    //Mem Controller
     input  wire                          MCIC_en,
     input  wire [BLOCK_WIDTH:0][31:0]    MCIC_block,  //a instruction has 32 bits
     output wire                          ICMC_en,

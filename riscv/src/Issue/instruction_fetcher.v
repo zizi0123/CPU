@@ -21,16 +21,18 @@ module InstructionFetcher (
     input  wire PDIF_en,
     input  wire PDIF_predict_result, //0: not taken, 1: taken
     output reg  IFPD_predict_en, //ask for prediction
-    output reg  IFPD_pc, //pc of branch instruction
+    output reg  [ADDR_WIDTH - 1:0] IFPD_pc, //pc of branch instruction
     output reg  IFPD_feedback_en, //feedback the result of branch instruction
     output reg  IFPD_branch_result, //0: not taken, 1: taken
+    output reg  [ADDR_WIDTH - 1:0] IFPD_feedback_pc, //the pc of the branch instruction
 
     //RoB
     input wire ROBIF_jalr_en,
     input wire ROBIF_branch_en,
-    input wire ROBIF_branch_result, //the result of the branch instruction, 0:wrong prediction, 1:correct prediction
-    input wire [ADDR_WIDTH - 1:0] ROBIF_branch_pc, //the pc of the branch instruction
-    input wire [ADDR_WIDTH - 1:0] ROBIF_next_pc
+    input wire ROBIF_judge_result, //the result of the branch instruction, 0:wrong prediction, 1:correct prediction
+    input wire ROBIF_branch_result, //the result of the branch instruction, 0: not taken, 1: taken
+    input wire [ADDR_WIDTH - 1:0] ROBIF_feedback_pc, //the pc of the branch instruction
+    input wire [ADDR_WIDTH - 1:0] ROBIF_next_pc //the pc of the next instruction for jalr/wrong prediction
 );
   parameter ADDR_WIDTH = 32;
   parameter NORMAL = 0, WAITING_PREDICT = 1, WAITING_ROB = 2;
@@ -54,11 +56,12 @@ module InstructionFetcher (
        IFIC_en <= 0;
     end 
     else if (Sys_rdy) begin
-        if(ROBIF_branch_en && !ROBIF_branch_result) begin //wrong prediction
+        if(ROBIF_branch_en && !ROBIF_judge_result) begin //wrong prediction
             pc <= ROBIF_next_pc;
             state <= NORMAL;
             IFPD_feedback_en <= 1;
             IFPD_branch_result <= ROBIF_branch_result;
+            IFPD_feedback_pc <= ROBIF_feedback_pc;
             IFIC_en <= 1;
             IFIC_pc <= ROBIF_next_pc; //attention pc in instruction fetcher and pc sent to ICache are update on the same posedge
             IFDP_en <= 0;
@@ -68,6 +71,7 @@ module InstructionFetcher (
             if(ROBIF_branch_en) begin //correct prediction, nothing happens, just give feedback
                 IFPD_feedback_en <= 1;
                 IFPD_branch_result <= ROBIF_branch_result;
+                IFPD_feedback_pc <= ROBIF_feedback_pc;
             end
             if(state == NORMAL && ICIF_en) begin //process a new instruction
                 if (opcode == 7'b1101111) begin : jal
