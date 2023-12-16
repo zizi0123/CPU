@@ -29,6 +29,7 @@ module ReservationStation (
     input wire RoBRS_pre_judge  //0:mispredict 1:correct
 );
 
+
   parameter ADDR_WIDTH = 32;
   parameter REG_WIDTH = 5;
   parameter EX_REG_WIDTH = 6;  //extra one bit for empty reg
@@ -93,7 +94,7 @@ module ReservationStation (
 
 
   genvar i;
-  generate
+  generate //update ready signal immediately
     for (i = 0; i < RS_SIZE; i = i + 1) begin : assign_ready
       assign ready[i] = (Qj[i] == NON_DEP) && (Qk[i] == NON_DEP) && busy[i];
     end
@@ -105,6 +106,33 @@ module ReservationStation (
 
   integer j;
 
+  always @(CDBRS_LSB_en or CDBRS_LSB_RoB_index or RSCDB_en or RSCDB_RoB_index) begin //update dependency immediately
+    if(CDBRS_LSB_en) begin
+      for (j = 0; j < RS_SIZE; ++j) begin
+        if (Qj[j] == CDBRS_LSB_RoB_index) begin
+          Qj[j] <= NON_DEP;
+          Vj[j] <= CDBRS_LSB_value;
+        end
+        if (Qk[j] == CDBRS_LSB_RoB_index) begin
+          Qk[j] <= NON_DEP;
+          Vk[j] <= CDBRS_LSB_value;
+        end
+      end
+    end
+    if(RSCDB_en) begin
+      for (j = 0; j < RS_SIZE; ++j) begin
+        if (Qj[j] == RSCDB_RoB_index) begin
+          Qj[j] <= NON_DEP;
+          Vj[j] <= RSCDB_value;
+        end
+        if (Qk[j] == RSCDB_RoB_index) begin
+          Qk[j] <= NON_DEP;
+          Vk[j] <= RSCDB_value;
+        end
+    end
+    end
+  end
+
   always @(posedge Sys_clk) begin
     if (Sys_rst || !RoBRS_pre_judge) begin
       for (j = 0; j < RS_SIZE; ++j) begin
@@ -112,7 +140,7 @@ module ReservationStation (
       end
       RSCDB_en <= 0;
     end else if (Sys_rdy) begin
-      if (DPRS_en && !RSDP_full) begin  //send a new instruction to RS
+      if (DPRS_en && !RSDP_full) begin  //send a new instruction to RS at posedge
         if (DPRS_Qj != NON_DEP) begin
           if (RSCDB_en && RSCDB_RoB_index == DPRS_Qj) begin
             Qj[idle_head] <= NON_DEP;  //check if Qj is ready in RS/LSB at this posedge through CBD
@@ -149,7 +177,7 @@ module ReservationStation (
         busy[idle_head] <= 1;
         pc[idle_head] <= DPRS_pc;
       end
-      if (ready_head != RS_SIZE) begin  //send a ready instruction to CDB
+      if (ready_head != RS_SIZE) begin  //send a ready instruction to CDB at posedge
         RSCDB_en <= 1;
         RSCDB_RoB_index <= RoB_index[ready_head];
         busy[ready_head] <= 0;
@@ -258,6 +286,8 @@ module ReservationStation (
             RSCDB_value <= Vj[ready_head] & Vk[ready_head];
           end
         endcase
+      end else begin
+        RSCDB_en <= 0;
       end
     end
   end

@@ -5,19 +5,21 @@ module decoder(
     input wire [6:0] IFDC_opcode,
     input wire [31:7] IFDC_remain_inst,
     input wire IFDC_predict_result, //0: not taken, 1: taken
+    output wire DCIF_ask_IF, //ask IF to fetch a new instruction
 
     //dispatcher
+    input wire  DPDC_ask_IF, //ask IF to fetch a new instruction
     output wire DCDP_en,
     output wire [ADDR_WIDTH - 1:0] DCDP_pc,
     output wire [6:0] DCDP_opcode,
     output wire [REG_WIDTH - 1:0] DCDP_rs1,
     output wire [REG_WIDTH - 1:0] DCDP_rs2,
     output wire [REG_WIDTH - 1:0] DCDP_rd,
-    output wire [19:0] DCDP_imm, 
+    output wire [31:0] DCDP_imm, 
     output wire DCDP_predict_result //0: not taken, 1: taken
 );
     parameter ADDR_WIDTH = 32;
-    parameter REG_WIDTH = 4;
+    parameter REG_WIDTH = 5;
     parameter lui = 7'd1;
     parameter auipc = 7'd2;
     parameter jal = 7'd3;
@@ -101,14 +103,15 @@ module decoder(
     assign DCDP_rs1 = IFDC_remain_inst[19:15];
     assign DCDP_rs2 = IFDC_remain_inst[24:20];
     assign DCDP_rd = IFDC_remain_inst[11:7];
-    assign DCDP_imm = (DCDP_opcode == lui || DCDP_opcode == auipc) ? IFDC_remain_inst[31:12] :
-                      (DCDP_opcode == jal) ? {IFDC_remain_inst[31], IFDC_remain_inst[19:12], IFDC_remain_inst[20], IFDC_remain_inst[30:21],1'b0} :
-                      (DCDP_opcode == jalr) ? IFDC_remain_inst[31:20] :
-                      (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu) ? {IFDC_remain_inst[31], IFDC_remain_inst[7], IFDC_remain_inst[30:25], IFDC_remain_inst[11:8], 1'b0} :
-                      (DCDP_opcode == lb || DCDP_opcode == lh || DCDP_opcode == lw || DCDP_opcode == lbu || DCDP_opcode == lhu) ? {IFDC_remain_inst[31:20]} :
-                      (DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? {IFDC_remain_inst[31:25], IFDC_remain_inst[11:7]} :
-                      (DCDP_opcode == addi || DCDP_opcode == slti || DCDP_opcode == sltiu || DCDP_opcode == xori || DCDP_opcode == ori || DCDP_opcode == andi ) ? IFDC_remain_inst[31:20] :
-                      (DCDP_opcode == slli || DCDP_opcode == srli || DCDP_opcode == srai) ? IFDC_remain_inst[24:20] :
-                      20'b0;
+    assign DCDP_imm = (DCDP_opcode == lui || DCDP_opcode == auipc) ? {IFDC_remain_inst[31:12],12'b0} :
+                      (DCDP_opcode == jal) ? {{12{IFDC_remain_inst[31]}}, IFDC_remain_inst[19:12], IFDC_remain_inst[20], IFDC_remain_inst[30:21],1'b0} :
+                      (DCDP_opcode == jalr) ? {{21{IFDC_remain_inst[31]}},IFDC_remain_inst[30:20]} :
+                      (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu) ? {{20{IFDC_remain_inst[31]}}, IFDC_remain_inst[7], IFDC_remain_inst[30:25], IFDC_remain_inst[11:8], 1'b0} :
+                      (DCDP_opcode == lb || DCDP_opcode == lh || DCDP_opcode == lw || DCDP_opcode == lbu || DCDP_opcode == lhu) ? {{21{IFDC_remain_inst[31]}},IFDC_remain_inst[30:20]} :
+                      (DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? {{21{IFDC_remain_inst[31]}},IFDC_remain_inst[30:25], IFDC_remain_inst[11:7]} :
+                      (DCDP_opcode == addi || DCDP_opcode == slti || DCDP_opcode == sltiu || DCDP_opcode == xori || DCDP_opcode == ori || DCDP_opcode == andi ) ? {{21{IFDC_remain_inst[31]}},IFDC_remain_inst[30:20]} :
+                      (DCDP_opcode == slli || DCDP_opcode == srli || DCDP_opcode == srai) ? {{27'b0},IFDC_remain_inst[24:20]} :
+                      32'b0;
+    assign DCIF_ask_IF = DPDC_ask_IF;   
 
 endmodule

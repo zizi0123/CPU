@@ -11,7 +11,7 @@ module Dispacher (
     input wire [REG_WIDTH - 1:0] DCDP_rs1,
     input wire [REG_WIDTH - 1:0] DCDP_rs2,
     input wire [REG_WIDTH - 1:0] DCDP_rd,
-    input wire [19:0] DCDP_imm,
+    input wire [31:0] DCDP_imm,
     input wire DCDP_predict_result,  //0: not taken, 1: taken
     output reg DPDC_ask_IF,  //ask IF to fetch a new instruction
 
@@ -33,7 +33,7 @@ module Dispacher (
     output wire [31:0] DPRS_Vk,
     output wire [EX_RoB_WIDTH - 1:0] DPRS_Qj,
     output wire [EX_RoB_WIDTH - 1:0] DPRS_Qk,
-    output wire [31:0] DPRS_imm,  //check 19:0 ?
+    output wire [31:0] DPRS_imm,  
     output wire [6:0] DPRS_opcode,
     output wire [RoB_WIDTH - 1:0] DPRS_RoB_index,
 
@@ -43,7 +43,7 @@ module Dispacher (
     output wire [31:0] DPLSB_Vk,
     output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qj,
     output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qk,
-    output wire [31:0] DPLSB_imm,  //check 19:0 ?
+    output wire [19:0] DPLSB_imm,  
     output wire [6:0] DPLSB_opcode,
     output wire [RoB_WIDTH - 1:0] DPLSB_RoB_index,
 
@@ -81,6 +81,7 @@ module Dispacher (
   parameter RoB_WIDTH = 8;
   parameter EX_RoB_WIDTH = 9;
   parameter NON_DEP = 9'b100000000;  //no dependency
+  
   parameter lui = 7'd1;
   parameter auipc = 7'd2;
   parameter jal = 7'd3;
