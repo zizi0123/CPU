@@ -250,6 +250,13 @@ module LoadStoreBuffer (
                 if(((opcode[mem_front] == lb || opcode[mem_front] == lbu) && MCLSB_data_number == 2'b00) || ((opcode[mem_front] == lh || opcode[mem_front] == lhu) && MCLSB_data_number == 2'b01) || (opcode[mem_front] == lw && MCLSB_data_number == 2'b10))begin
                   state[mem_front] <= WAITING_COMMIT;
                   mem_front <= (mem_front + 1) % LSB_SIZE;
+                  if(opcode[mem_front] == sb) begin //sign extend
+                    Vk[mem_front][31:8] <= {24{Vk[mem_front][7]}};
+                  end
+                  if(opcode[mem_front] == sh) begin //sign extend
+                    Vk[mem_front][31:16] <= {16{Vk[mem_front][15]}};
+                  end
+                  end
                 end
               end
             end
