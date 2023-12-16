@@ -19,7 +19,7 @@ module RegisterFile (
     input wire RoBRF_pre_judge,  //this is instant signal 0:mispredict 1:correct if mispredict,
     input wire RoBRF_en,  //commit a new instruction, RoB index,rd,value is valid now!
     input wire [RoB_WIDTH - 1:0] RoBRF_RoB_index,
-    input wire [REG_WIDTH - 1:0] RoBRF_rd,
+    input wire [EX_REG_WIDTH - 1:0] RoBRF_rd,
     input wire [31:0] RoBRF_value
 );
 

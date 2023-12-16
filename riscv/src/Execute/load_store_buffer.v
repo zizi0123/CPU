@@ -10,7 +10,7 @@ module LoadStoreBuffer (
     input wire [31:0] DPLSB_Vk,
     input wire [EX_RoB_WIDTH - 1:0] DPLSB_Qj,
     input wire [EX_RoB_WIDTH - 1:0] DPLSB_Qk,
-    input wire [ADDR_WIDTH - 1:0] DPLSB_imm,
+    input wire [31:0] DPLSB_imm,
     input wire [6:0] DPLSB_opcode,
     input wire [RoB_WIDTH - 1:0] DPLSB_RoB_index,
     output wire LSBDP_full,
@@ -202,7 +202,7 @@ module LoadStoreBuffer (
       end
       if (busy[front]) begin
         if (state[front] == WAITING_COMMIT) begin  //"commit": write to memory or sent to CDB
-          if (front_type == LOAD) begin
+          if (front_type == LOAD) begin //send to CDB
             LSBCDB_en <= 1;
             LSBCDB_RoB_index <= RoB_index[front];
             LSBCDB_value <= Vk[front];
@@ -215,7 +215,7 @@ module LoadStoreBuffer (
             end
           end else begin  //front_type == STORE
             LSBCDB_en <= 0;
-            if (RoBLSB_commit_index + 1 == RoB_index[front]) begin
+            if (RoBLSB_commit_index + 1 == RoB_index[front]) begin //commit, write to memory
               LSBMC_en <= 1;
               LSBMC_wr <= WRITE;
               LSBMC_data_width <= (opcode[front] == sb) ? 1 : (opcode[front] == sh) ? 2 : 4;

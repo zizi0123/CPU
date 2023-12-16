@@ -1,5 +1,3 @@
-`include "../define.v"
-
 module MC (
     //sys
     input wire Sys_clk,
@@ -14,14 +12,14 @@ module MC (
     input  wire        io_buffer_full, // 1 if uart buffer is full
 
     //ICache
-    input  wire                ICMC_en,
-    input  wire [        31:0] ICMC_addr,
-    output reg                 MCIC_en,
-    output reg  [`BLOCK_RANGE] MCIC_block,
+    input  wire                         ICMC_en,
+    input  wire [                 31:0] ICMC_addr,
+    output reg                          MCIC_en,
+    output reg  [32 * BLOCK_SIZE - 1:0] MCIC_block,
 
     //LSB
     input  wire        LSBMC_en,
-    input  wire        LSBMC_wr,          // write/read signal (1 for write)
+    input  wire        LSBMC_wr,          // 0:read,1:write
     input  wire [ 1:0] LSBMC_data_width,  //0:byte,1:hw,2:w
     input  wire [ 7:0] LSBMC_data,
     input  wire [31:0] LSBMC_addr,
@@ -29,6 +27,8 @@ module MC (
     output reg  [ 7:0] MCLSB_data
 );
 
+  parameter BLOCK_WIDTH = 1;  //a block has 2^1 instructions
+  parameter BLOCK_SIZE = 1 << BLOCK_WIDTH;
   parameter LSB = 0, ICACHE = 1,  //last_serve
   IDLE = 0, READ = 1, WRITE = 2;  //working_state
 

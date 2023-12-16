@@ -1,0 +1,57 @@
+module CDB (
+    //RS
+    input wire RSCDB_en,
+    input wire [RoB_WIDTH - 1:0] RSCDB_RoB_index,
+    input wire [31:0] RSCDB_value,
+    input wire [ADDR_WIDTH - 1:0] RSCDB_next_pc,
+    output wire CDBRS_LSB_en,
+    output wire [RoB_WIDTH - 1:0] CDBRS_LSB_RoB_index,
+    output wire [31:0] CDBRS_LSB_value,
+
+    //LSB
+    input wire LSBCDB_en,
+    input wire [RoB_WIDTH - 1:0] LSBCDB_RoB_index,
+    input wire [31:0] LSBCDB_value,
+    output wire CDBLSB_RS_en,
+    output wire [RoB_WIDTH - 1:0] CDBLSB_RS_RoB_index,
+    output wire [31:0] CDBLSB_RS_value,
+
+    //RoB
+    output wire CDBRoB_RS_en,
+    output wire [RoB_WIDTH - 1:0] CDBRoB_RS_RoB_index,
+    output wire [31:0] CDBRoB_RS_value,
+    output wire [ADDR_WIDTH - 1:0] CDBRoB_RS_next_pc,
+    output wire CDBRoB_LSB_en,
+    output wire [RoB_WIDTH - 1:0] CDBRoB_LSB_RoB_index,
+    output wire [31:0] CDBRoB_LSB_value
+
+);
+
+  parameter ADDR_WIDTH = 32;
+  parameter REG_WIDTH = 5;
+  parameter EX_REG_WIDTH = 6;  //extra one bit for empty reg
+  parameter NON_REG = 6'b100000;
+  parameter RoB_WIDTH = 8;
+  parameter EX_RoB_WIDTH = 9;
+  parameter RS_WIDTH = 3;
+  parameter EX_RS_WIDTH = 4;
+  parameter RS_SIZE = 1 << RS_WIDTH;
+  parameter NON_DEP = 9'b100000000;  //no dependency
+
+
+  assign CDBRS_LSB_en = LSBCDB_en,
+         CDBRS_LSB_RoB_index = LSBCDB_RoB_index,
+         CDBRS_LSB_value = LSBCDB_value,
+        CDBRoB_LSB_en = LSBCDB_en,
+        CDBRoB_LSB_RoB_index = LSBCDB_RoB_index,
+         CDBRoB_LSB_value = LSBCDB_value;
+
+  assign CDBLSB_RS_en = RSCDB_en,
+         CDBLSB_RS_RoB_index = RSCDB_RoB_index,
+         CDBLSB_RS_value = RSCDB_value,
+         CDBRoB_RS_en = RSCDB_en,
+        CDBRoB_RS_RoB_index = RSCDB_RoB_index,
+        CDBRoB_RS_value = RSCDB_value,
+        CDBRoB_RS_next_pc = RSCDB_next_pc;
+
+endmodule

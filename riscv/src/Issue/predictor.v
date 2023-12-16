@@ -17,21 +17,21 @@ module predictor(
     output reg  PDIF_predict_result //0: not taken, 1: taken
 );
     parameter ADDR_WIDTH = 32;
-    parameter K = 4; //hash length
+    parameter HASH_WIDTH = 4; //hash length
     parameter HISTORY_LENGTH = 4; //history length
 
-    wire [K - 1:0] hash_num_prediction;
+    wire [HASH_WIDTH - 1:0] hash_num_prediction;
     wire [HISTORY_LENGTH - 1:0] BHR_prediction;
-    wire [K - 1:0] hash_num_feedback;
+    wire [HASH_WIDTH - 1:0] hash_num_feedback;
     wire [HISTORY_LENGTH - 1:0] BHR_feedback;
-    reg  [HISTORY_LENGTH - 1:0] BHRs [K - 1:0];
+    reg  [HISTORY_LENGTH - 1:0] BHRs [(1 << HASH_WIDTH) - 1:0];
 
 
-    assign hash_num_prediction = IFPD_pc[K - 1 + 2:2];
+    assign hash_num_prediction = IFPD_pc[HASH_WIDTH - 1 + 2:2];
     assign BHR_prediction = BHRs[hash_num_prediction];
-    assign hash_num_feedback = IFPD_feedback_pc[K - 1 + 2:2];
+    assign hash_num_feedback = IFPD_feedback_pc[HASH_WIDTH - 1 + 2:2];
     assign BHR_feedback = BHRs[hash_num_feedback];
-    SaturatedCounter pattern_history_table [K - 1:0][HISTORY_LENGTH - 1:0];
+    SaturatedCounter pattern_history_table [HASH_WIDTH - 1:0][HISTORY_LENGTH - 1:0]; //attention check 2D array
 
     always @(*)begin
        //attention not considering reset signal     

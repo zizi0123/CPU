@@ -1,8 +1,8 @@
 module Dispacher (
     //sys
-    input wire clk,
-    input wire rst,
-    input wire rdy,
+    input wire Sys_clk,
+    input wire Sys_rst,
+    input wire Sys_rdy,
 
     //Decoder
     input wire DCDP_en,
@@ -27,37 +27,41 @@ module Dispacher (
     output wire [EX_REG_WIDTH - 1:0] DPRF_rd,
 
     //Reservation Station
-    output reg  DPRS_en,  //send a new instruction to RS
+    input wire RSDP_full,
+    output reg DPRS_en,  //send a new instruction to RS
     output wire [ADDR_WIDTH - 1:0] DPRS_pc,
     output wire [31:0] DPRS_Vj,
     output wire [31:0] DPRS_Vk,
     output wire [EX_RoB_WIDTH - 1:0] DPRS_Qj,
     output wire [EX_RoB_WIDTH - 1:0] DPRS_Qk,
-    output wire [31:0] DPRS_imm,  
+    output wire [31:0] DPRS_imm,
     output wire [6:0] DPRS_opcode,
     output wire [RoB_WIDTH - 1:0] DPRS_RoB_index,
 
     //Load Store Buffer
+    input wire LSBDP_full,
     output reg DPLSB_en,  //send a new instruction to LSB
     output wire [31:0] DPLSB_Vj,
     output wire [31:0] DPLSB_Vk,
     output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qj,
     output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qk,
-    output wire [19:0] DPLSB_imm,  
+    output wire [31:0] DPLSB_imm,
     output wire [6:0] DPLSB_opcode,
     output wire [RoB_WIDTH - 1:0] DPLSB_RoB_index,
 
     //Reorder Buffer 
+    input wire RoBDP_full,
     input wire [RoB_WIDTH - 1:0] RoBDP_RoB_index,
-    input wire RoBDP_pre_judge, //0:mispredict 1:correct
     input wire RoBDP_Qj_ready,  //RoB item Qj is ready in RoB
     input wire RoBDP_Qk_ready,  //RoB item Qk is ready in RoB
     input wire [31:0] RoBDP_Vj,
     input wire [31:0] RoBDP_Vk,
-    output wire [EX_RoB_WIDTH - 1:0] DPRoB_Qj,  //check if Qj is ready in RoB
-    output wire [EX_RoB_WIDTH - 1:0] DPRoB_Qk,  //check if Qk is ready in RoB
-    output reg  DPRoB_en,  //send a new instruction to RoB
+    input wire RoBDP_pre_judge,  //0:mispredict 1:correct
+    output wire [EX_RoB_WIDTH - 1:0] DPRoB_Qj,  //prefetch:ask if Qj is ready in RoB
+    output wire [EX_RoB_WIDTH - 1:0] DPRoB_Qk,  //prefetch:ask if Qk is ready in RoB
+    output reg DPRoB_en,  //send a new instruction to RoB
     output wire [ADDR_WIDTH - 1:0] DPRoB_pc,
+    output wire [31:0] DPRoB_imm,
     output wire DPRoB_predict_result,
     output wire [6:0] DPRoB_opcode,
     output wire [EX_REG_WIDTH - 1:0] DPRoB_rd,
@@ -68,10 +72,8 @@ module Dispacher (
     input wire [31:0] CDBDP_RS_value,
     input wire CDBDP_LSB_en,
     input wire [RoB_WIDTH - 1:0] CDBDP_LSB_RoB_index,
-    input wire [31:0] CDBDP_LSB_value,
+    input wire [31:0] CDBDP_LSB_value
 
-    //full signal //attention change to RS in LSB in and RoB in ?
-    input wire full  //0: not full, 1: RoB or RS or LSB is gsfull
 
 );
   parameter ADDR_WIDTH = 32;
@@ -81,7 +83,7 @@ module Dispacher (
   parameter RoB_WIDTH = 8;
   parameter EX_RoB_WIDTH = 9;
   parameter NON_DEP = 9'b100000000;  //no dependency
-  
+
   parameter lui = 7'd1;
   parameter auipc = 7'd2;
   parameter jal = 7'd3;
@@ -132,6 +134,7 @@ module Dispacher (
   assign DPRoB_Qj = RFDP_Qj;
   assign DPRoB_Qk = RFDP_Qk;
   assign DPRoB_pc = DCDP_pc;
+  assign DPRoB_imm = DCDP_imm;
   assign DPRoB_predict_result = DCDP_predict_result;
   assign DPRoB_opcode = DCDP_opcode;
   assign DPRoB_rd = DPRF_rd;
@@ -157,8 +160,8 @@ module Dispacher (
   reg [31:0] Vj, Vk;
   reg state;
 
-  
-  always @(*) begin //try to get Vj/Vk from RoB or CDB immediately
+
+  always @(*) begin  //try to get Vj/Vk from RoB or CDB immediately
     if (RFDP_Qj != NON_DEP) begin
       if(!RoBDP_Qj_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qj) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qj)) begin
         //Qj is not ready
@@ -197,8 +200,8 @@ module Dispacher (
 
 
 
-  always @(posedge clk) begin  //get a new instruction
-    if (!RoBDP_pre_judge || rst) begin : clear
+  always @(posedge Sys_clk) begin  //get a new instruction
+    if (!RoBDP_pre_judge || Sys_rst) begin : clear
       state <= IDLE;
       DPDC_ask_IF <= 0;
       DPRF_en <= 0;
@@ -209,13 +212,13 @@ module Dispacher (
       Qk <= 0;
       Vj <= 0;
       Vk <= 0;
-    end else if (rdy) begin
+    end else if (Sys_rdy) begin
       if (state == IDLE) begin  //ask for a new instruction
         DPRF_en  <= 0;
         DPRS_en  <= 0;
         DPLSB_en <= 0;
         DPRoB_en <= 0;
-        if (full) begin
+        if (RSDP_full || LSBDP_full || RoBDP_full) begin
           DPDC_ask_IF <= 0;
         end else begin
           DPDC_ask_IF <= 1;

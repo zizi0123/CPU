@@ -206,19 +206,11 @@ module ReservationStation (
           end
           blt: begin
             RSCDB_value <= ($signed(Vj[ready_head]) < $signed(Vk[ready_head])) ? 1 : 0;
-            RSCDB_next_pc <= ($signed(
-                Vj[ready_head]
-            ) < $signed(
-                Vk[ready_head]
-            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+            RSCDB_next_pc <= ($signed(Vj[ready_head]) < $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bge: begin
             RSCDB_value <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? 1 : 0;
-            RSCDB_next_pc <= ($signed(
-                Vj[ready_head]
-            ) >= $signed(
-                Vk[ready_head]
-            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+            RSCDB_next_pc <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bltu: begin
             RSCDB_value <= (Vj[ready_head] < Vk[ready_head]) ? 1 : 0;
