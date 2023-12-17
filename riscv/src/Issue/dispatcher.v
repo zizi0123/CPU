@@ -30,10 +30,10 @@ module Dispacher (
     input wire RSDP_full,
     output reg DPRS_en,  //send a new instruction to RS
     output wire [ADDR_WIDTH - 1:0] DPRS_pc,
-    output wire [31:0] DPRS_Vj,
-    output wire [31:0] DPRS_Vk,
     output wire [EX_RoB_WIDTH - 1:0] DPRS_Qj,
     output wire [EX_RoB_WIDTH - 1:0] DPRS_Qk,
+    output wire [31:0] DPRS_Vj,
+    output wire [31:0] DPRS_Vk,
     output wire [31:0] DPRS_imm,
     output wire [6:0] DPRS_opcode,
     output wire [RoB_WIDTH - 1:0] DPRS_RoB_index,
@@ -41,10 +41,10 @@ module Dispacher (
     //Load Store Buffer
     input wire LSBDP_full,
     output reg DPLSB_en,  //send a new instruction to LSB
-    output wire [31:0] DPLSB_Vj,
-    output wire [31:0] DPLSB_Vk,
     output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qj,
     output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qk,
+    output wire [31:0] DPLSB_Vj,
+    output wire [31:0] DPLSB_Vk,
     output wire [31:0] DPLSB_imm,
     output wire [6:0] DPLSB_opcode,
     output wire [RoB_WIDTH - 1:0] DPLSB_RoB_index,
@@ -74,7 +74,6 @@ module Dispacher (
     input wire [RoB_WIDTH - 1:0] CDBDP_LSB_RoB_index,
     input wire [31:0] CDBDP_LSB_value
 
-
 );
   parameter ADDR_WIDTH = 32;
   parameter REG_WIDTH = 5;
@@ -83,6 +82,8 @@ module Dispacher (
   parameter RoB_WIDTH = 8;
   parameter EX_RoB_WIDTH = 9;
   parameter NON_DEP = 9'b100000000;  //no dependency
+  parameter IDLE = 0, WAITING_INS = 1;
+
 
   parameter lui = 7'd1;
   parameter auipc = 7'd2;
@@ -121,8 +122,8 @@ module Dispacher (
   parameter sra = 7'd35;
   parameter orr = 7'd36;
   parameter andd = 7'd37;
-  parameter IDLE = 0, WAITING_INS = 1;
 
+  //RF
   assign DPRF_rs1 = (DCDP_opcode == lui || DCDP_opcode == auipc || DCDP_opcode == jal) ? NON_REG : DCDP_rs1;
   assign DPRF_rs2 = (DCDP_opcode == lui || DCDP_opcode == auipc || DCDP_opcode == jal ||
                        DCDP_opcode == lb || DCDP_opcode == lh || DCDP_opcode == lw || DCDP_opcode == lbu || DCDP_opcode == lhu ||
@@ -130,7 +131,7 @@ module Dispacher (
                        DCDP_opcode == slli || DCDP_opcode == srli || DCDP_opcode == srai) ? NON_REG : DCDP_rs2;
   assign DPRF_rd = (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu || DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? NON_REG : DCDP_rd;
   assign DPRF_RoB_index = RoBDP_RoB_index;
-  assign DPRoB_rd = (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu || DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? NON_REG : DCDP_rd;
+  //RoB
   assign DPRoB_Qj = RFDP_Qj;
   assign DPRoB_Qk = RFDP_Qk;
   assign DPRoB_pc = DCDP_pc;
@@ -138,14 +139,16 @@ module Dispacher (
   assign DPRoB_predict_result = DCDP_predict_result;
   assign DPRoB_opcode = DCDP_opcode;
   assign DPRoB_rd = DPRF_rd;
+  //RS
   assign DPRS_RoB_index = RoBDP_RoB_index;
+  assign DPRS_pc = DCDP_pc;
   assign DPRS_Qj = Qj;
   assign DPRS_Qk = Qk;
   assign DPRS_Vj = Vj;
   assign DPRS_VK = Vk;
-  assign DPRS_pc = DCDP_pc;
-  assign DPRS_opcode = DCDP_opcode;
   assign DPRS_imm = DCDP_imm;
+  assign DPRS_opcode = DCDP_opcode;
+  //LSB
   assign DPLSB_RoB_index = RoBDP_RoB_index;
   assign DPLSB_Qj = Qj;
   assign DPLSB_Qk = Qk;
@@ -154,11 +157,9 @@ module Dispacher (
   assign DPLSB_opcode = DCDP_opcode;
   assign DPLSB_imm = DCDP_imm;
 
-
-
   reg [EX_RoB_WIDTH - 1:0] Qj, Qk;
   reg [31:0] Vj, Vk;
-  reg state;
+  reg state; //IDLE, WAITING_INS
 
 
   always @(*) begin  //try to get Vj/Vk from RoB or CDB immediately
@@ -208,16 +209,16 @@ module Dispacher (
       DPRS_en <= 0;
       DPLSB_en <= 0;
       DPRoB_en <= 0;
-      Qj <= 0;
-      Qk <= 0;
+      Qj <= NON_DEP;
+      Qk <= NON_DEP;
       Vj <= 0;
       Vk <= 0;
     end else if (Sys_rdy) begin
       if (state == IDLE) begin  //ask for a new instruction
         DPRF_en  <= 0;
+        DPRoB_en <= 0;
         DPRS_en  <= 0;
         DPLSB_en <= 0;
-        DPRoB_en <= 0;
         if (RSDP_full || LSBDP_full || RoBDP_full) begin
           DPDC_ask_IF <= 0;
         end else begin

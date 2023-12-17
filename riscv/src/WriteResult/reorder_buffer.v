@@ -116,6 +116,7 @@ module ReorderBuffer (
   reg [RoB_WIDTH -1 : 0] front;
   reg [RoB_WIDTH -1 : 0] rear;
   reg [RoB_WIDTH -1 : 0] commit_front;  //the last committed instruction in RoB
+  reg pre_judge;
   wire front_type;
 
   assign front_type = (busy[front] && (opcode[front] == beq || opcode[front] == bne || opcode[front] == blt || opcode[front] == bge || opcode[front] == bltu || opcode[front] == bgeu)) ? BRANCH : (busy[front] && opcode[front] == jalr) ? JALR : OTHER;
@@ -131,76 +132,98 @@ module ReorderBuffer (
   //LSB
   assign RoBLSB_commit_index = commit_front;
 
+  integer i;
+
   always @(posedge Sys_clk) begin
-    //Dispatcher
-    if (DPRoB_en) begin  //issue an new instruction to RoB
-      RoB_index[rear] <= rear;
-      pc[rear] <= DPRoB_pc;
-      opcode[rear] <= DPRoB_opcode;
-      rd[rear] <= DPRoB_rd;
-      pre_result[rear] <= DPRoB_predict_result;
-      busy[rear] <= 1;
-      state[rear] <= UNREADY;
-      rear <= (rear + 1) % RoB_SIZE;
-    end
+    if (Sys_rst || !pre_judge) begin
+      for (i = 0; i < RoB_SIZE; ++i) begin
+        RoB_index[i] <= 0;
+        pc[i] <= 0;
+        opcode[i] <= 0;
+        rd[i] <= 0;
+        pre_result[i] <= 0;
+        value[i] <= 0;
+        next_pc[i] <= 0;
+        busy[i] <= 0;
+        state[i] <= UNREADY;
+      end
+      front <= 0;
+      rear <= 0;
+      commit_front <= 0;
+      pre_judge <= 1;
+    end else if (Sys_rdy) begin
+      //Dispatcher
+      if (DPRoB_en) begin  //issue an new instruction to RoB
+        RoB_index[rear] <= rear;
+        pc[rear] <= DPRoB_pc;
+        opcode[rear] <= DPRoB_opcode;
+        rd[rear] <= DPRoB_rd;
+        pre_result[rear] <= DPRoB_predict_result;
+        busy[rear] <= 1;
+        state[rear] <= UNREADY;
+        rear <= (rear + 1) % RoB_SIZE;
+      end
 
-    //CDB
-    if (CDBRoB_RS_en) begin  //CDB update RoB
-      state[CDBRoB_RS_RoB_index]   <= READY;
-      value[CDBRoB_RS_RoB_index]   <= CDBRoB_RS_value;
-      next_pc[CDBRoB_RS_RoB_index] <= CDBRoB_RS_next_pc;
-    end
-    if (CDBRoB_LSB_en) begin  //CDB update RoB
-      state[CDBRoB_LSB_RoB_index] <= READY;
-      value[CDBRoB_LSB_RoB_index] <= CDBRoB_LSB_value;
-    end
+      //CDB
+      if (CDBRoB_RS_en) begin  //CDB update RoB
+        state[CDBRoB_RS_RoB_index]   <= READY;
+        value[CDBRoB_RS_RoB_index]   <= CDBRoB_RS_value;
+        next_pc[CDBRoB_RS_RoB_index] <= CDBRoB_RS_next_pc;
+      end
+      if (CDBRoB_LSB_en) begin  //CDB update RoB
+        state[CDBRoB_LSB_RoB_index] <= READY;
+        value[CDBRoB_LSB_RoB_index] <= CDBRoB_LSB_value;
+      end
+      
+      //LoadStore Buffer
+      if (LSBRoB_commit_index == front) begin  //store instruction has been committed to mem in LSB
+        busy[front] <= 0;
+        state[front] <= UNREADY;
+        front <= (front + 1) % RoB_SIZE;
+        commit_front <= front;
+      end
 
-    //LoadStore Buffer
-    if (LSBRoB_commit_index == front) begin  //store instruction has been committed to mem in LSB
-      busy[front] <= 0;
-      state[front] <= UNREADY;
-      front <= (front + 1) % RoB_SIZE;
-      commit_front <= front;
-    end
+      //RF
+      if (busy[front] && state[front] == READY) begin  //commit an instruction to RF
+        RoBRF_en <= 1;
+        RoBRF_RoB_index <= front;
+        RoBRF_rd <= rd[front];
+        RoBRF_value <= value[front];
+        busy[front] <= 0;
+        state[front] <= UNREADY;
+        front <= (front + 1) % RoB_SIZE;
+        commit_front <= front;
+      end else begin
+        RoBRF_en <= 0;
+      end
 
-    //RF
-    if (busy[front] && state[front] == READY) begin  //commit an instruction to RF
-      RoBRF_en <= 1;
-      RoBRF_RoB_index <= front;
-      RoBRF_rd <= rd[front];
-      RoBRF_value <= value[front];
-      busy[front] <= 0;
-      state[front] <= UNREADY;
-      front <= (front + 1) % RoB_SIZE;
-      commit_front <= front;
-    end else begin
-      RoBRF_en <= 0;
-    end
-
-    //Instruction fetcher
-    if (CDBRoB_RS_en && opcode[CDBRoB_RS_RoB_index] == jalr) begin
-      RoBIF_jalr_en <= 1;
-      RoBIF_next_pc <= CDBRoB_RS_next_pc;
-    end else begin
-      RoBIF_jalr_en <= 0;
-    end
-    if (busy[front] && front_type == BRANCH && state[front] == READY) begin
-      RoBIF_branch_en <= 1;
-      RoBIF_pre_judge <= pre_result[front] == value[front];
-      RoBDP_pre_judge <= pre_result[front] == value[front];
-      RoBRF_pre_judge <= pre_result[front] == value[front];
-      RoBRS_pre_judge <= pre_result[front] == value[front];
-      RoBLSB_pre_judge <= pre_result[front] == value[front];
-      RoBIF_branch_result <= value[front];
-      RoBIF_branch_pc <= pc[front];
-      RoBIF_next_pc <= next_pc[front];
-    end else begin
-      RoBIF_branch_en <= 0;
-      RoBIF_pre_judge <= 0;
-      RoBDP_pre_judge <= 0;
-      RoBRF_pre_judge <= 0;
-      RoBRS_pre_judge <= 0;
-      RoBLSB_pre_judge <= 0;
+      //Instruction fetcher
+      if (CDBRoB_RS_en && opcode[CDBRoB_RS_RoB_index] == jalr) begin
+        RoBIF_jalr_en <= 1;
+        RoBIF_next_pc <= CDBRoB_RS_next_pc;
+      end else begin
+        RoBIF_jalr_en <= 0;
+      end
+      if (busy[front] && front_type == BRANCH && state[front] == READY) begin
+        RoBIF_branch_en <= 1;
+        RoBIF_pre_judge <= pre_result[front] == value[front];
+        RoBDP_pre_judge <= pre_result[front] == value[front];
+        RoBRF_pre_judge <= pre_result[front] == value[front];
+        RoBRS_pre_judge <= pre_result[front] == value[front];
+        RoBLSB_pre_judge <= pre_result[front] == value[front];
+        pre_judge <= pre_result[front] == value[front];
+        RoBIF_branch_result <= value[front];
+        RoBIF_branch_pc <= pc[front];
+        RoBIF_next_pc <= next_pc[front];
+      end else begin
+        RoBIF_branch_en <= 0;
+        RoBIF_pre_judge <= 0;
+        RoBDP_pre_judge <= 0;
+        RoBRF_pre_judge <= 0;
+        RoBRS_pre_judge <= 0;
+        RoBLSB_pre_judge <= 0;
+        pre_judge <= 0;
+      end
     end
   end
 

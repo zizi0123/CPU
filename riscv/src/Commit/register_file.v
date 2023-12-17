@@ -36,8 +36,8 @@ module RegisterFile (
   reg [EX_RoB_WIDTH - 1:0] dependency[REG_SIZE - 1:0];
 
   //output Qj,Qk,Vj,Vk immediately
-  assign RFDP_Qj = (RoBRF_pre_judge || DPRF_rs1 == NON_REG || (RoBRF_en && dependency[DPRF_rs1] == RoBRF_RoB_index)) ? NON_DEP : dependency[DPRF_rs1];
-  assign RFDP_Qk = (RoBRF_pre_judge || DPRF_rs2 == NON_REG || (RoBRF_en && dependency[DPRF_rs2] == RoBRF_RoB_index)) ? NON_DEP : dependency[DPRF_rs2];
+  assign RFDP_Qj = (!RoBRF_pre_judge || DPRF_rs1 == NON_REG || (RoBRF_en && dependency[DPRF_rs1] == RoBRF_RoB_index)) ? NON_DEP : dependency[DPRF_rs1];
+  assign RFDP_Qk = (!RoBRF_pre_judge || DPRF_rs2 == NON_REG || (RoBRF_en && dependency[DPRF_rs2] == RoBRF_RoB_index)) ? NON_DEP : dependency[DPRF_rs2];
   assign RFDP_Vj = (DPRF_rs1 == NON_REG) ? 0 : ((RoBRF_en && dependency[DPRF_rs1] == RoBRF_RoB_index) ? RoBRF_value : ((dependency[DPRF_rs1] == NON_DEP) ? registers[DPRF_rs1] : 0));
   assign RFDP_Vk = (DPRF_rs2 == NON_REG) ? 0 : ((RoBRF_en && dependency[DPRF_rs2] == RoBRF_RoB_index) ? RoBRF_value : ((dependency[DPRF_rs2] == NON_DEP) ? registers[DPRF_rs2] : 0));
 
