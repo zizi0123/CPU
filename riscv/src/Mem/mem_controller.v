@@ -8,24 +8,24 @@ module MemController (
     input wire [7:0] RAMMC_data,  // data from ram
     input wire io_buffer_full,  // 1 if uart buffer is full. can't write/read to 0x30000 now.
     output reg [7:0] MCRAM_data,  // data output bus
-    output reg [31:0] MCRAM_addr,  // address bus (only 17:0 is used)
+    output reg [ADDR_WIDTH - 1:0] MCRAM_addr,  // address bus (only 17:0 is used)
     output reg MCRAM_wr,  // write/read signal (1 for write)
 
     //ICache
     input  wire                         ICMC_en,
-    input  wire [                 31:0] ICMC_addr,
+    input  wire [     ADDR_WIDTH - 1:0] ICMC_addr,
     output reg                          MCIC_en,
     output reg  [32 * BLOCK_SIZE - 1:0] MCIC_block,
 
     //LSB
-    input  wire        LSBMC_en,
-    input  wire        LSBMC_wr,          // 0:read,1:write
-    input  wire [ 2:0] LSBMC_data_width,  //0:byte,1:hw,2:w
-    input  wire [31:0] LSBMC_data,
-    input  wire [31:0] LSBMC_addr,
-    output reg         MCLSB_en,
-    output reg  [ 7:0] MCLSB_data,
-    output reg  [ 1:0] MCLSB_data_number
+    input  wire                    LSBMC_en,
+    input  wire                    LSBMC_wr,          // 0:read,1:write
+    input  wire [             2:0] LSBMC_data_width,  //0:byte,1:hw,2:w
+    input  wire [            31:0] LSBMC_data,
+    input  wire [ADDR_WIDTH - 1:0] LSBMC_addr,
+    output reg                     MCLSB_en,
+    output reg  [             7:0] MCLSB_data,
+    output reg  [             1:0] MCLSB_data_number
 );
   parameter BLOCK_WIDTH = 1;  //a block has 2^1 instructions
   parameter BLOCK_SIZE = 1 << BLOCK_WIDTH;
@@ -128,7 +128,7 @@ module MemController (
             MCIC_en <= 1;
           end
         end
-      end else if (working_state == WRITE) begin
+      end else if (working_state == WRITE && !io_buffer_full) begin
         // if (!LSBMC_en) begin
         //   working_state <= IDLE;
         //   remain_byte_num <= 0;
