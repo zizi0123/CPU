@@ -1,17 +1,17 @@
 // RISCV32I CPU top module
 // port modification allowed for debugging purposes
 
-`include "Mem/mem_controller.v"
-`include "Mem/ins_cache.v"
-`include "Issue/decoder.v"
-`include "Issue/dispatcher.v"
-`include "Issue/instruction_fetcher.v"
-`include "Issue/predictor.v"
-`include "Execute/reservation_station.v"
-`include "Execute/load_store_buffer.v"
-`include "WriteResult/reorder_buffer.v"
-`include "WriteResult/CDB.v"
-`include "Commit/register_file.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Mem/mem_controller.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Mem/ins_cache.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/decoder.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/dispatcher.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/instruction_fetcher.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/predictor.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Execute/reservation_station.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Execute/load_store_buffer.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/WriteResult/reorder_buffer.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/WriteResult/CDB.v"
+`include "/mnt/d/大二/RISCV-CPU/riscv/src/Commit/register_file.v"
 
 module cpu (
     input wire clk_in,  // system clock signal
@@ -73,7 +73,7 @@ module cpu (
 
   //Instruction Fetcher
   wire IFIC_en;
-  wire [ADDR_WIDTH - 1:0] IFIC_pc;
+  wire [ADDR_WIDTH - 1:0] IFIC_addr;
   wire IFDC_en;
   wire [ADDR_WIDTH - 1:0] IFDC_pc;
   wire [6:0] IFDC_opcode;
@@ -86,13 +86,12 @@ module cpu (
   wire [ADDR_WIDTH - 1:0] IFPD_feedback_pc;
 
   //Predictor
-  wire PDIF_en;
   wire PDIF_predict_result;
 
   //Decoder
   wire DCIF_ask_IF;
   wire DCDP_en;
-  wire [ADDR_WIDTH - 1:0] DCDP_p;
+  wire [ADDR_WIDTH - 1:0] DCDP_pc;
   wire [6:0] DCDP_opcode;
   wire [REG_WIDTH - 1:0] DCDP_rs1;
   wire [REG_WIDTH - 1:0] DCDP_rs2;
@@ -185,16 +184,25 @@ module cpu (
   wire CDBRS_LSB_en;
   wire [RoB_WIDTH - 1:0] CDBRS_LSB_RoB_index;
   wire [31:0] CDBRS_LSB_value;
+
   wire CDBLSB_RS_en;
   wire [RoB_WIDTH - 1:0] CDBLSB_RS_RoB_index;
   wire [31:0] CDBLSB_RS_value;
+
   wire CDBRoB_RS_en;
   wire [RoB_WIDTH - 1:0] CDBRoB_RS_RoB_index;
-  wire [31:0] CDBRoB_RS_value;
+  wire [31:0] CDBRoB_RS_value;  
   wire [ADDR_WIDTH - 1:0] CDBRoB_RS_next_pc;
   wire CDBRoB_LSB_en;
   wire [RoB_WIDTH - 1:0] CDBRoB_LSB_RoB_index;
   wire [31:0] CDBRoB_LSB_value;
+
+  wire CDBDP_RS_en;
+  wire [RoB_WIDTH - 1:0] CDBDP_RS_RoB_index;
+  wire [31:0] CDBDP_RS_value;
+  wire CDBDP_LSB_en;
+  wire [RoB_WIDTH - 1:0] CDBDP_LSB_RoB_index;
+  wire [31:0] CDBDP_LSB_value;
 
   //MemCtrl
   MemController mem_controller(
@@ -235,7 +243,7 @@ module cpu (
     .ICMC_addr(ICMC_addr),
 
     .IFIC_en(IFIC_en),
-    .IFIC_pc(IFIC_pc),
+    .IFIC_addr(IFIC_addr),
     .ICIF_en(ICIF_en),
     .ICIF_data(ICIF_data)
   );
@@ -249,7 +257,7 @@ module cpu (
     .ICIF_en(ICIF_en),
     .ICIF_data(ICIF_data),
     .IFIC_en(IFIC_en),
-    .IFIC_pc(IFIC_pc),
+    .IFIC_addr(IFIC_addr),
 
     .DCIF_ask_IF(DCIF_ask_IF),
     .IFDC_en(IFDC_en),
@@ -258,13 +266,12 @@ module cpu (
     .IFDC_remain_inst(IFDC_remain_inst),
     .IFDC_predict_result(IFDC_predict_result),
 
-    .PDIF_en(PDIF_en),
     .PDIF_predict_result(PDIF_predict_result),
     .IFPD_predict_en(IFPD_predict_en),
     .IFPD_pc(IFPD_pc),
     .IFPD_feedback_en(IFPD_feedback_en),
     .IFPD_branch_result(IFPD_branch_result),
-    .IFPD_feedback_pc(IFPD_feedback_pc)
+    .IFPD_feedback_pc(IFPD_feedback_pc),
 
     .RoBIF_jalr_en(RoBIF_jalr_en),
     .RoBIF_branch_en(RoBIF_branch_en),
@@ -281,17 +288,12 @@ module cpu (
     .Sys_rst(rst_in),
     .Sys_rdy(rdy_in),
 
-    .PDIF_en(PDIF_en),
-    .PDIF_predict_result(PDIF_predict_result),
-
-    .DCDP_en(DCDP_en),
-    .DCDP_p(DCDP_p),
-    .DCDP_opcode(DCDP_opcode),
-    .DCDP_rs1(DCDP_rs1),
-    .DCDP_rs2(DCDP_rs2),
-    .DCDP_rd(DCDP_rd),
-    .DCDP_imm(DCDP_imm),
-    .DCDP_predict_result(DCDP_predict_result)
+    .IFPD_predict_en(IFPD_predict_en),
+    .IFPD_pc(IFPD_pc),
+    .IFPD_feedback_en(IFPD_feedback_en),
+    .IFPD_branch_result(IFPD_branch_result),
+    .IFPD_feedback_pc(IFPD_feedback_pc),
+    .PDIF_predict_result(PDIF_predict_result)
   );
 
   //Decoder
@@ -304,18 +306,18 @@ module cpu (
     .DCIF_ask_IF(DCIF_ask_IF),
 
     .DPDC_ask_IF(DPDC_ask_IF),
-    .DPDP_en(DPDP_en),
+    .DCDP_en(DCDP_en),
     .DCDP_pc(DCDP_pc),
     .DCDP_opcode(DCDP_opcode),
     .DCDP_rs1(DCDP_rs1),
     .DCDP_rs2(DCDP_rs2),
     .DCDP_rd(DCDP_rd),
     .DCDP_imm(DCDP_imm),
-    .DCDP_predict_result(DCDP_predict_result),
-  )
+    .DCDP_predict_result(DCDP_predict_result)
+  );
 
   //Dispatcher
-  Dispatcher dispacher(
+  Dispatcher dispatcher(
     .Sys_clk(clk_in),
     .Sys_rst(rst_in),
     .Sys_rdy(rdy_in),
@@ -334,8 +336,8 @@ module cpu (
     .CDBDP_RS_value(CDBDP_RS_value),
     .CDBDP_LSB_en(CDBDP_LSB_en),
     .CDBDP_LSB_RoB_index(CDBDP_LSB_RoB_index),
-    .CDBDP_LSB_value(CDBDP_LSB_value),
-  )
+    .CDBDP_LSB_value(CDBDP_LSB_value)
+  );
 
   //Register File
   RegisterFile register_file(
@@ -358,7 +360,7 @@ module cpu (
     .RoBRF_RoB_index(RoBRF_RoB_index),
     .RoBRF_rd(RoBRF_rd),
     .RoBRF_value(RoBRF_value)
-  )
+  );
 
   //Reservation Station
   ReservationStation reservation_station(
@@ -379,11 +381,11 @@ module cpu (
 
     .CDBRS_LSB_en(CDBRS_LSB_en),
     .CDBRS_LSB_RoB_index(CDBRS_LSB_RoB_index),
-    .CDBRS_LSB_value(CDBRS_LSB_value)
+    .CDBRS_LSB_value(CDBRS_LSB_value),
     .RSCDB_en(RSCDB_en),
     .RSCDB_RoB_index(RSCDB_RoB_index),
     .RSCDB_value(RSCDB_value),
-    .RSCDB_next_pc(RSCDB_next_pc)
+    .RSCDB_next_pc(RSCDB_next_pc),
 
     .RoBRS_pre_judge(RoBRS_pre_judge)
   );
@@ -401,13 +403,13 @@ module cpu (
     .DPRoB_predict_result(DPRoB_predict_result),
     .DPRoB_opcode(DPRoB_opcode),
     .DPRoB_rd(DPRoB_rd),
-    .DPRP_full(DPRP_full),
-    .DPRP_RoB_index(DPRP_RoB_index),
-    .DPRP_pre_judge(DPRP_pre_judge),
-    .DPRP_Qj_ready(DPRP_Qj_ready),
-    .DPRP_Qk_ready(DPRP_Qk_ready),
-    .DPRP_Vj(DPRP_Vj),
-    .DPRP_Vk(DPRP_Vk),
+    .RoBDP_full(DPRP_full),
+    .RoBDP_RoB_index(RoBDP_RoB_index),
+    .RoBDP_pre_judge(RoBDP_pre_judge),
+    .RoBDP_Qj_ready(RoBDP_Qj_ready),
+    .RoBDP_Qk_ready(RoBDP_Qk_ready),
+    .RoBDP_Vj(RoBDP_Vj),
+    .RoBDP_Vk(RoBDP_Vk),
 
     .RoBIF_jalr_en(RoBIF_jalr_en),
     .RoBIF_branch_en(RoBIF_branch_en),
@@ -428,7 +430,7 @@ module cpu (
     .CDBRoB_RS_next_pc(CDBRoB_RS_next_pc),
     .CDBRoB_LSB_en(CDBRoB_LSB_en),
     .CDBRoB_LSB_RoB_index(CDBRoB_LSB_RoB_index),
-    .CDBRoB_LSB_value(CDBRoB_LSB_value)
+    .CDBRoB_LSB_value(CDBRoB_LSB_value),
 
     .RoBRF_pre_judge(RoBRF_pre_judge),
     .RoBRF_en(RoBRF_en),
@@ -471,12 +473,12 @@ module cpu (
     .LSBCDB_value(LSBCDB_value),
 
     .RoBLSB_pre_judge(RoBLSB_pre_judge),
-    .RoBLSB_commit_index(RoBLSB_commit_index)
+    .RoBLSB_commit_index(RoBLSB_commit_index),
     .LSBRoB_commit_index(LSBRoB_commit_index)
-  )
+  );
 
-  //CBD
-  CBD cdb(
+  //CDB
+  CDB cdb(
     .RSCDB_en(RSCDB_en),
     .RSCDB_RoB_index(RSCDB_RoB_index),
     .RSCDB_value(RSCDB_value),
@@ -499,23 +501,7 @@ module cpu (
     .CDBRoB_LSB_en(CDBRoB_LSB_en),
     .CDBRoB_LSB_RoB_index(CDBRoB_LSB_RoB_index),
     .CDBRoB_LSB_value(CDBRoB_LSB_value)
-  )
-
-
-
-
-
-
-
-  
-
-
-
-
-
-
-
-
+  );
 
 
   always @(posedge clk_in) begin

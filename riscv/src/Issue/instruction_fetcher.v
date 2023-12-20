@@ -8,7 +8,7 @@ module InstructionFetcher (
     input  wire                    ICIF_en,
     input  wire [            31:0] ICIF_data,
     output wire                    IFIC_en,
-    output wire [ADDR_WIDTH - 1:0] IFIC_pc,
+    output wire [ADDR_WIDTH - 1:0] IFIC_addr,
 
     //Decoder
     input wire DCIF_ask_IF,  //ask for a new instruction
@@ -42,7 +42,7 @@ module InstructionFetcher (
   reg [1:0] state;
 
   assign IFIC_en = DCIF_ask_IF;
-  assign IFIC_pc = pc;
+  assign IFIC_addr = pc;
   assign IFDC_pc = pc;
   assign IFDC_opcode = ICIF_data[6:0];
   assign IFDC_remain_inst = ICIF_data[31:7];

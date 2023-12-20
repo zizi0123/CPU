@@ -1,4 +1,4 @@
-module predictor (
+module Predictor (
     //sys
     input wire Sys_clk,
     input wire Sys_rst,

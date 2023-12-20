@@ -1,5 +1,8 @@
 // riscv top module file
 // modification allowed for debugging purposes
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/ram.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/cpu.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/hci.v"
 
 module riscv_top
 #(

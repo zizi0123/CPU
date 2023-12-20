@@ -23,8 +23,15 @@ module CDB (
     output wire [ADDR_WIDTH - 1:0] CDBRoB_RS_next_pc,
     output wire CDBRoB_LSB_en,
     output wire [RoB_WIDTH - 1:0] CDBRoB_LSB_RoB_index,
-    output wire [31:0] CDBRoB_LSB_value
+    output wire [31:0] CDBRoB_LSB_value,
 
+    //Dispatcher
+    output wire CDBDP_RS_en,
+    output wire [RoB_WIDTH - 1:0] CDBDP_RS_RoB_index,
+    output wire [31:0] CDBDP_RS_value,
+    output wire CDBDP_LSB_en,
+    output wire [RoB_WIDTH - 1:0] CDBDP_LSB_RoB_index,
+    output wire [31:0] CDBDP_LSB_value
 );
 
   parameter ADDR_WIDTH = 32;
@@ -53,5 +60,12 @@ module CDB (
       CDBRoB_RS_RoB_index = RSCDB_RoB_index,
       CDBRoB_RS_value = RSCDB_value,
       CDBRoB_RS_next_pc = RSCDB_next_pc;
+
+  assign CDBDP_RS_en = RSCDB_en,
+      CDBDP_RS_RoB_index = RSCDB_RoB_index,
+      CDBDP_RS_value = RSCDB_value,
+      CDBDP_LSB_en = LSBCDB_en,
+      CDBDP_LSB_RoB_index = LSBCDB_RoB_index,
+      CDBDP_LSB_value = LSBCDB_value;
 
 endmodule

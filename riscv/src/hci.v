@@ -27,6 +27,9 @@
 
 // modification allowed for debugging purposes
 
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/common/fifo/fifo.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/common/uart/uart.v"
+
 module hci
 #(
   parameter SYS_CLK_FREQ = 100000000,

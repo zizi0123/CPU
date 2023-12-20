@@ -1,4 +1,4 @@
-module Dispacher (
+module Dispatcher (
     //sys
     input wire Sys_clk,
     input wire Sys_rst,
@@ -162,7 +162,11 @@ module Dispacher (
   reg state; //IDLE, WAITING_INS
 
 
-  always @(*) begin  //try to get Vj/Vk from RoB or CDB immediately
+  //check Qj/Qk dependency from :
+  //1. RF (and RoB commit at this posedge);
+  //2. RoB;
+  //3, CDB(RS, LSB);
+  always @(*) begin  
     if (RFDP_Qj != NON_DEP) begin
       if(!RoBDP_Qj_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qj) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qj)) begin
         //Qj is not ready
