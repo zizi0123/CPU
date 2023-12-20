@@ -6,10 +6,10 @@ module LoadStoreBuffer (
 
     //dispatcher
     input wire DPLSB_en,
-    input wire [31:0] DPLSB_Vj,
-    input wire [31:0] DPLSB_Vk,
     input wire [EX_RoB_WIDTH - 1:0] DPLSB_Qj,
     input wire [EX_RoB_WIDTH - 1:0] DPLSB_Qk,
+    input wire [31:0] DPLSB_Vj,
+    input wire [31:0] DPLSB_Vk,
     input wire [31:0] DPLSB_imm,
     input wire [6:0] DPLSB_opcode,
     input wire [RoB_WIDTH - 1:0] DPLSB_RoB_index,
@@ -92,7 +92,7 @@ module LoadStoreBuffer (
   parameter orr = 7'd36;
   parameter andd = 7'd37;
 
-  reg [RoB_WIDTH - 1:0] RoB_index;
+  reg [RoB_WIDTH - 1:0] RoB_index [LSB_SIZE - 1:0];
   reg [6:0] opcode[LSB_SIZE - 1:0];
   reg [31:0] Vj[LSB_SIZE - 1:0];
   reg [31:0] Vk[LSB_SIZE - 1:0];  //used for load data in LOAD instructions

@@ -40,18 +40,18 @@ module CDB (
 
 
   assign CDBRS_LSB_en = LSBCDB_en,
-         CDBRS_LSB_RoB_index = LSBCDB_RoB_index,
-         CDBRS_LSB_value = LSBCDB_value,
-        CDBRoB_LSB_en = LSBCDB_en,
-        CDBRoB_LSB_RoB_index = LSBCDB_RoB_index,
-         CDBRoB_LSB_value = LSBCDB_value;
+      CDBRS_LSB_RoB_index = LSBCDB_RoB_index,
+      CDBRS_LSB_value = LSBCDB_value,
+      CDBRoB_LSB_en = LSBCDB_en,
+      CDBRoB_LSB_RoB_index = LSBCDB_RoB_index,
+      CDBRoB_LSB_value = LSBCDB_value;
 
   assign CDBLSB_RS_en = RSCDB_en,
-         CDBLSB_RS_RoB_index = RSCDB_RoB_index,
-         CDBLSB_RS_value = RSCDB_value,
-         CDBRoB_RS_en = RSCDB_en,
-        CDBRoB_RS_RoB_index = RSCDB_RoB_index,
-        CDBRoB_RS_value = RSCDB_value,
-        CDBRoB_RS_next_pc = RSCDB_next_pc;
+      CDBLSB_RS_RoB_index = RSCDB_RoB_index,
+      CDBLSB_RS_value = RSCDB_value,
+      CDBRoB_RS_en = RSCDB_en,
+      CDBRoB_RS_RoB_index = RSCDB_RoB_index,
+      CDBRoB_RS_value = RSCDB_value,
+      CDBRoB_RS_next_pc = RSCDB_next_pc;
 
 endmodule

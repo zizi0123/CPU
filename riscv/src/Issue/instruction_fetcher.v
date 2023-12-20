@@ -19,9 +19,8 @@ module InstructionFetcher (
     output wire IFDC_predict_result,  //0: not taken, 1: taken
 
     //predictor
-    input wire PDIF_en,
-    input wire PDIF_predict_result,  //0: not taken, 1: taken
-    output reg IFPD_predict_en,  //ask for prediction
+    input wire PDIF_predict_result,  //0: not taken, 1: taken. immediate result of prediction
+    output wire IFPD_predict_en,  //ask for prediction
     output wire [ADDR_WIDTH - 1:0] IFPD_pc,  //pc of branch instruction
     output reg IFPD_feedback_en,  //feedback the result of branch instruction
     output wire IFPD_branch_result,  //0: not taken, 1: taken
@@ -52,6 +51,7 @@ module InstructionFetcher (
       :(IFDC_opcode == 7'b1100011) ? {{20{ICIF_data[31]}},ICIF_data[7],ICIF_data[30:25],ICIF_data[11:8],1'b0}  //branch
       : 32'b0;
   assign IFPD_pc = pc;
+  assign IFPD_predict_en = (IFDC_opcode == 7'b1100011);
   assign IFPD_branch_result = RoBIF_branch_result;
   assign IFPD_feedback_pc = RoBIF_branch_pc;
 
@@ -61,14 +61,12 @@ module InstructionFetcher (
       pc <= 0;
       state <= NORMAL;
       IFDC_en <= 0;
-      IFPD_predict_en <= 0;
       IFPD_feedback_en <= 0;
     end else if (Sys_rdy) begin
       if (!RoBIF_pre_judge) begin  //wrong prediction
         pc <= RoBIF_next_pc;
         state <= NORMAL;
         IFDC_en <= 0;
-        IFPD_predict_en <= 0;
         IFPD_feedback_en <= 1;
       end else begin
         if (RoBIF_branch_en) begin  //feedback of correct prediction
@@ -78,25 +76,16 @@ module InstructionFetcher (
           if (IFDC_opcode == 7'b1101111) begin : jal
             pc <= pc + imm;
             IFDC_en <= 1;
-            IFPD_predict_en <= 0;
           end else if (IFDC_opcode == 7'b1100011) begin : branch
-            state <= WAITING_PREDICT;
-            IFDC_en <= 0;
-            IFPD_predict_en <= 1;
-          end else if (IFDC_opcode == 7'b1100111) begin : jalr
-            state <= WAITING_RoB;
+            pc <= PDIF_predict_result ? pc + imm : pc + 4;
             IFDC_en <= 1;
-            IFPD_predict_en <= 0;
+          end else if (IFDC_opcode == 7'b1100111) begin : jalr
+            state   <= WAITING_RoB;
+            IFDC_en <= 1;
           end else begin : other
             pc <= pc + 4;
             IFDC_en <= 1;
-            IFPD_predict_en <= 0;
           end
-        end else if (state == WAITING_PREDICT && PDIF_en) begin  //result from predictor
-          state <= NORMAL;
-          pc <= PDIF_predict_result ? pc + imm : pc + 4;
-          IFDC_en <= 1;
-          IFPD_predict_en <= 0;
         end else if (state == WAITING_RoB && RoBIF_jalr_en) begin  //result of jalr from RoB
           state <= NORMAL;
           pc <= RoBIF_next_pc;

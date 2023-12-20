@@ -7,10 +7,10 @@ module ReservationStation (
     //dispatcher
     input wire DPRS_en,  //send a new instruction to RS
     input wire [ADDR_WIDTH - 1:0] DPRS_pc,
-    input wire [31:0] DPRS_Vj,
-    input wire [31:0] DPRS_Vk,
     input wire [EX_RoB_WIDTH - 1:0] DPRS_Qj,
     input wire [EX_RoB_WIDTH - 1:0] DPRS_Qk,
+    input wire [31:0] DPRS_Vj,
+    input wire [31:0] DPRS_Vk,
     input wire [31:0] DPRS_imm,
     input wire [6:0] DPRS_opcode,
     input wire [RoB_WIDTH - 1:0] DPRS_RoB_index,
@@ -21,7 +21,7 @@ module ReservationStation (
     input wire [RoB_WIDTH - 1:0] CDBRS_LSB_RoB_index,
     input wire [31:0] CDBRS_LSB_value,
     output reg RSCDB_en,
-    output reg [RoB_WIDTH - 1:0] RSCDB_RoB_index,
+    output wire [RoB_WIDTH - 1:0] RSCDB_RoB_index,
     output reg [31:0] RSCDB_value,  //rd value or branch result(jump or not)
     output reg [ADDR_WIDTH - 1:0] RSCDB_next_pc,
 
@@ -79,7 +79,7 @@ module ReservationStation (
   parameter orr = 7'd36;
   parameter andd = 7'd37;
 
-  reg [RoB_WIDTH - 1:0] RoB_index;
+  reg [RoB_WIDTH - 1:0] RoB_index[RS_SIZE - 1:0];
   reg busy[RS_SIZE - 1:0];
   reg [6:0] opcode[RS_SIZE - 1:0];
   reg [31:0] Vj[RS_SIZE - 1:0];
@@ -94,20 +94,22 @@ module ReservationStation (
 
 
   genvar i;
-  generate //update ready signal immediately
+  generate  //update ready signal immediately
     for (i = 0; i < RS_SIZE; i = i + 1) begin : assign_ready
-      assign ready[i] = (Qj[i] == NON_DEP) && (Qk[i] == NON_DEP) && busy[i];
+      assign ready[i] = busy[i] && (Qj[i] == NON_DEP) && (Qk[i] == NON_DEP);
     end
   endgenerate
 
   assign idle_head = (!busy[0]) ? 0 : (!busy[1]) ? 1 : (!busy[2]) ? 2 : (!busy[3]) ? 3 : (!busy[4]) ? 4 : (!busy[5]) ? 5 : (!busy[6]) ? 6 : (!busy[7]) ? 7 : 8;
   assign ready_head = (ready[0]) ? 0 : (ready[1]) ? 1 : (ready[2]) ? 2 : (ready[3]) ? 3 : (ready[4]) ? 4 : (ready[5]) ? 5 : (ready[6]) ? 6 : (ready[7]) ? 7 : 8;
   assign RSDP_full = idle_head == RS_SIZE;
+  assign RSCDB_RoB_index = ready_head == RS_SIZE ? 0 : RoB_index[ready_head];
+
 
   integer j;
 
   always @(CDBRS_LSB_en or CDBRS_LSB_RoB_index or RSCDB_en or RSCDB_RoB_index) begin //update dependency immediately
-    if(CDBRS_LSB_en) begin
+    if (CDBRS_LSB_en) begin
       for (j = 0; j < RS_SIZE; ++j) begin
         if (Qj[j] == CDBRS_LSB_RoB_index) begin
           Qj[j] <= NON_DEP;
@@ -119,7 +121,7 @@ module ReservationStation (
         end
       end
     end
-    if(RSCDB_en) begin
+    if (RSCDB_en) begin
       for (j = 0; j < RS_SIZE; ++j) begin
         if (Qj[j] == RSCDB_RoB_index) begin
           Qj[j] <= NON_DEP;
@@ -129,7 +131,7 @@ module ReservationStation (
           Qk[j] <= NON_DEP;
           Vk[j] <= RSCDB_value;
         end
-    end
+      end
     end
   end
 
@@ -179,7 +181,6 @@ module ReservationStation (
       end
       if (ready_head != RS_SIZE) begin  //send a ready instruction to CDB at posedge
         RSCDB_en <= 1;
-        RSCDB_RoB_index <= RoB_index[ready_head];
         busy[ready_head] <= 0;
         case (opcode[ready_head])
           lui: begin
@@ -206,7 +207,7 @@ module ReservationStation (
           end
           blt: begin
             RSCDB_value <= ($signed(Vj[ready_head]) < $signed(Vk[ready_head])) ? 1 : 0;
-            RSCDB_next_pc <= ($signed(Vj[ready_head]) < $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+            RSCDB_next_pc <= ($signed(Vj[ready_head]) < $signed( Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bge: begin
             RSCDB_value <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? 1 : 0;

@@ -51,20 +51,19 @@ module RegisterFile (
         dependency[i] <= NON_DEP;
       end
     end else if (Sys_rdy) begin
-      if (!RoBRF_pre_judge) begin  //if the commit instruction is branch, then there's no rd
+      if (!RoBRF_pre_judge) begin  //if the commit instruction is branch, then there's no rd to commit
         for (i = 0; i < REG_SIZE; i = i + 1) begin
           dependency[i] <= NON_DEP;  //clear dependency
         end
-      end
-      if (RoBRF_en && RoBRF_rd != NON_REG) begin : commit
-        registers[RoBRF_rd] <= RoBRF_value;  //update register value
-        if (RoBRF_pre_judge && (dependency[RoBRF_rd] == RoBRF_RoB_index) && (!DPRF_en || DPRF_rd != RoBRF_rd)) begin
-          dependency[RoBRF_rd] <= NON_DEP;  //clear dependency
+      end else begin
+        if (RoBRF_en && RoBRF_rd != NON_REG) begin  //commit to register file
+          registers[RoBRF_rd] <= RoBRF_value;  //update register value
+          if ((dependency[RoBRF_rd] == RoBRF_RoB_index) && (!DPRF_en || DPRF_rd != RoBRF_rd)) begin
+            dependency[RoBRF_rd] <= NON_DEP;  //clear dependency
+          end
         end
-      end
-      if (DPRF_en) begin
-        if (RoBRF_pre_judge && DPRF_rd != NON_REG) begin
-          dependency[DPRF_rd] <= DPRF_RoB_index; //update dependency
+        if (DPRF_en && (DPRF_rd != NON_REG)) begin  //update dependency
+          dependency[DPRF_rd] <= DPRF_RoB_index;
         end
       end
     end

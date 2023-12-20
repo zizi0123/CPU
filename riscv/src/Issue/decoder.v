@@ -1,4 +1,4 @@
-module decoder(
+module Decoder(
     //instruction fetcher
     input wire IFDC_en,
     input wire [ADDR_WIDTH - 1:0] IFDC_pc,

@@ -14,7 +14,7 @@ module ReorderBuffer (
     input wire [EX_REG_WIDTH - 1:0] DPRoB_rd,
     output wire RoBDP_full,
     output wire [RoB_WIDTH - 1:0] RoBDP_RoB_index,
-    output reg RoBDP_pre_judge,  //0:mispredict 1:correct
+    output wire RoBDP_pre_judge,  //0:mispredict 1:correct
     output wire RoBDP_Qj_ready,  //RoB item Qj is ready in RoB
     output wire RoBDP_Qk_ready,  //RoB item Qk is ready in RoB
     output wire [31:0] RoBDP_Vj,
@@ -23,17 +23,17 @@ module ReorderBuffer (
     //Instruction Fetcher
     output reg RoBIF_jalr_en,
     output reg RoBIF_branch_en,
-    output reg RoBIF_pre_judge, //the result of the branch instruction, 0:wrong prediction, 1:correct prediction
+    output wire RoBIF_pre_judge, //the result of the branch instruction, 0:wrong prediction, 1:correct prediction
     output reg RoBIF_branch_result,  //the result of the branch instruction, 0: not taken, 1: taken
     output reg [ADDR_WIDTH - 1:0] RoBIF_branch_pc,  //the pc of the branch instruction
     output reg [ADDR_WIDTH - 1:0] RoBIF_next_pc, //the pc of the next instruction for jalr/wrong prediction
 
     //ReservationStation
-    output reg RoBRS_pre_judge,
+    output wire RoBRS_pre_judge,
 
     //LoadStoreBuffer
     input wire [RoB_WIDTH - 1:0] LSBRoB_commit_index,  //the last committed store instruction in LSB
-    output reg RoBLSB_pre_judge,
+    output wire RoBLSB_pre_judge,
     output wire RoBLSB_commit_index,
 
     //CDB
@@ -46,7 +46,7 @@ module ReorderBuffer (
     input wire [31:0] CDBRoB_LSB_value,
 
     //RegisterFile
-    output reg RoBRF_pre_judge,
+    output wire RoBRF_pre_judge,
     output reg RoBRF_en,  //commit a new instruction, RoB index,rd,value is valid now!
     output reg [RoB_WIDTH - 1:0] RoBRF_RoB_index,
     output reg [EX_REG_WIDTH - 1:0] RoBRF_rd,
@@ -124,13 +124,24 @@ module ReorderBuffer (
   //Dispatcher
   assign RoBDP_full = (rear == front);
   assign RoBDP_RoB_index = rear;
+  assign RoBDP_pre_judge = pre_judge;
   assign RoBDP_Qj_ready = (DPRoB_Qj == NON_DEP || state[DPRoB_Qj] == READY);
   assign RoBDP_Qk_ready = (DPRoB_Qk == NON_DEP || state[DPRoB_Qk] == READY);
   assign RoBDP_Vj = (DPRoB_Qj == NON_DEP) ? 0 : value[DPRoB_Qj];
   assign RoBDP_Vk = (DPRoB_Qk == NON_DEP) ? 0 : value[DPRoB_Qk];
 
+  //Instruction Fetcher
+  assign RoBIF_pre_judge = pre_judge;
+
+  //RS
+  assign RoBRS_pre_judge = pre_judge;
+
   //LSB
   assign RoBLSB_commit_index = commit_front;
+  assign RoBLSB_pre_judge = pre_judge;
+
+  //RF
+  assign RoBRF_pre_judge = pre_judge;
 
   integer i;
 
@@ -206,22 +217,12 @@ module ReorderBuffer (
       end
       if (busy[front] && front_type == BRANCH && state[front] == READY) begin
         RoBIF_branch_en <= 1;
-        RoBIF_pre_judge <= pre_result[front] == value[front];
-        RoBDP_pre_judge <= pre_result[front] == value[front];
-        RoBRF_pre_judge <= pre_result[front] == value[front];
-        RoBRS_pre_judge <= pre_result[front] == value[front];
-        RoBLSB_pre_judge <= pre_result[front] == value[front];
         pre_judge <= pre_result[front] == value[front];
         RoBIF_branch_result <= value[front];
         RoBIF_branch_pc <= pc[front];
         RoBIF_next_pc <= next_pc[front];
       end else begin
         RoBIF_branch_en <= 0;
-        RoBIF_pre_judge <= 0;
-        RoBDP_pre_judge <= 0;
-        RoBRF_pre_judge <= 0;
-        RoBRS_pre_judge <= 0;
-        RoBLSB_pre_judge <= 0;
         pre_judge <= 0;
       end
     end
