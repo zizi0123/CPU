@@ -20,51 +20,50 @@ module Dispatcher (
     input wire [EX_RoB_WIDTH - 1:0] RFDP_Qk,
     input wire [31:0] RFDP_Vj,
     input wire [31:0] RFDP_Vk,
-    output reg DPRF_en,  //attention rd to regfile is ready
     output wire [EX_REG_WIDTH - 1:0] DPRF_rs1,
     output wire [EX_REG_WIDTH - 1:0] DPRF_rs2,
-    output wire [RoB_WIDTH - 1:0] DPRF_RoB_index,  //the dependency RoB# of rd
-    output wire [EX_REG_WIDTH - 1:0] DPRF_rd,
+    output reg DPRF_en,  //attention rd to regfile is ready
+    output reg [RoB_WIDTH - 1:0] DPRF_RoB_index,  //the dependency RoB# of rd
+    output reg [EX_REG_WIDTH - 1:0] DPRF_rd,
 
     //Reservation Station
     input wire RSDP_full,
     output reg DPRS_en,  //send a new instruction to RS
-    output wire [ADDR_WIDTH - 1:0] DPRS_pc,
-    output wire [EX_RoB_WIDTH - 1:0] DPRS_Qj,
-    output wire [EX_RoB_WIDTH - 1:0] DPRS_Qk,
-    output wire [31:0] DPRS_Vj,
-    output wire [31:0] DPRS_Vk,
-    output wire [31:0] DPRS_imm,
-    output wire [6:0] DPRS_opcode,
-    output wire [RoB_WIDTH - 1:0] DPRS_RoB_index,
+    output reg [ADDR_WIDTH - 1:0] DPRS_pc,
+    output reg [EX_RoB_WIDTH - 1:0] DPRS_Qj,
+    output reg [EX_RoB_WIDTH - 1:0] DPRS_Qk,
+    output reg [31:0] DPRS_Vj,
+    output reg [31:0] DPRS_Vk,
+    output reg [31:0] DPRS_imm,
+    output reg [6:0] DPRS_opcode,
+    output reg [RoB_WIDTH - 1:0] DPRS_RoB_index,
 
     //Load Store Buffer
     input wire LSBDP_full,
     output reg DPLSB_en,  //send a new instruction to LSB
-    output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qj,
-    output wire [EX_RoB_WIDTH - 1:0] DPLSB_Qk,
-    output wire [31:0] DPLSB_Vj,
-    output wire [31:0] DPLSB_Vk,
-    output wire [31:0] DPLSB_imm,
-    output wire [6:0] DPLSB_opcode,
-    output wire [RoB_WIDTH - 1:0] DPLSB_RoB_index,
+    output reg [EX_RoB_WIDTH - 1:0] DPLSB_Qj,
+    output reg [EX_RoB_WIDTH - 1:0] DPLSB_Qk,
+    output reg [31:0] DPLSB_Vj,
+    output reg [31:0] DPLSB_Vk,
+    output reg [31:0] DPLSB_imm,
+    output reg [6:0] DPLSB_opcode,
+    output reg [RoB_WIDTH - 1:0] DPLSB_RoB_index,
 
     //Reorder Buffer 
     input wire RoBDP_full,
     input wire [RoB_WIDTH - 1:0] RoBDP_RoB_index,
+    input wire RoBDP_pre_judge,  //0:mispredict 1:correct
     input wire RoBDP_Qj_ready,  //RoB item Qj is ready in RoB
     input wire RoBDP_Qk_ready,  //RoB item Qk is ready in RoB
     input wire [31:0] RoBDP_Vj,
     input wire [31:0] RoBDP_Vk,
-    input wire RoBDP_pre_judge,  //0:mispredict 1:correct
     output wire [EX_RoB_WIDTH - 1:0] DPRoB_Qj,  //prefetch:ask if Qj is ready in RoB
     output wire [EX_RoB_WIDTH - 1:0] DPRoB_Qk,  //prefetch:ask if Qk is ready in RoB
     output reg DPRoB_en,  //send a new instruction to RoB
-    output wire [ADDR_WIDTH - 1:0] DPRoB_pc,
-    output wire [31:0] DPRoB_imm,
-    output wire DPRoB_predict_result,
-    output wire [6:0] DPRoB_opcode,
-    output wire [EX_REG_WIDTH - 1:0] DPRoB_rd,
+    output reg [ADDR_WIDTH - 1:0] DPRoB_pc,
+    output reg DPRoB_predict_result,
+    output reg [6:0] DPRoB_opcode,
+    output reg [EX_REG_WIDTH - 1:0] DPRoB_rd,
 
     //CDB
     input wire CDBDP_RS_en,
@@ -125,51 +124,27 @@ module Dispatcher (
 
   //RF
   assign DPRF_rs1 = (DCDP_opcode == lui || DCDP_opcode == auipc || DCDP_opcode == jal) ? NON_REG : DCDP_rs1;
-  assign DPRF_rs2 = (DCDP_opcode == lui || DCDP_opcode == auipc || DCDP_opcode == jal ||
+  assign DPRF_rs2 = (DCDP_opcode == lui || DCDP_opcode == auipc || DCDP_opcode == jal || DCDP_opcode == jalr ||
                        DCDP_opcode == lb || DCDP_opcode == lh || DCDP_opcode == lw || DCDP_opcode == lbu || DCDP_opcode == lhu ||
                        DCDP_opcode == addi || DCDP_opcode == slti || DCDP_opcode == sltiu || DCDP_opcode == xori || DCDP_opcode == ori || DCDP_opcode == andi ||
                        DCDP_opcode == slli || DCDP_opcode == srli || DCDP_opcode == srai) ? NON_REG : DCDP_rs2;
-  assign DPRF_rd = (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu || DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? NON_REG : DCDP_rd;
-  assign DPRF_RoB_index = RoBDP_RoB_index;
   //RoB
   assign DPRoB_Qj = RFDP_Qj;
   assign DPRoB_Qk = RFDP_Qk;
-  assign DPRoB_pc = DCDP_pc;
-  assign DPRoB_imm = DCDP_imm;
-  assign DPRoB_predict_result = DCDP_predict_result;
-  assign DPRoB_opcode = DCDP_opcode;
-  assign DPRoB_rd = DPRF_rd;
-  //RS
-  assign DPRS_RoB_index = RoBDP_RoB_index;
-  assign DPRS_pc = DCDP_pc;
-  assign DPRS_Qj = Qj;
-  assign DPRS_Qk = Qk;
-  assign DPRS_Vj = Vj;
-  assign DPRS_VK = Vk;
-  assign DPRS_imm = DCDP_imm;
-  assign DPRS_opcode = DCDP_opcode;
-  //LSB
-  assign DPLSB_RoB_index = RoBDP_RoB_index;
-  assign DPLSB_Qj = Qj;
-  assign DPLSB_Qk = Qk;
-  assign DPLSB_Vj = Vj;
-  assign DPLSB_VK = Vk;
-  assign DPLSB_opcode = DCDP_opcode;
-  assign DPLSB_imm = DCDP_imm;
 
   reg [EX_RoB_WIDTH - 1:0] Qj, Qk;
   reg [31:0] Vj, Vk;
-  reg state; //IDLE, WAITING_INS
+  reg state;  //IDLE, WAITING_INS
 
 
   //check Qj/Qk dependency from :
   //1. RF (and RoB commit at this posedge);
   //2. RoB;
   //3, CDB(RS, LSB);
-  always @(*) begin  
+  always @(*) begin
     if (RFDP_Qj != NON_DEP) begin
       if(!RoBDP_Qj_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qj) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qj)) begin
-        //Qj is not ready
+        //Qj is really not ready
         Qj = RFDP_Qj;
         Vj = RFDP_Vj;
       end else begin
@@ -183,10 +158,12 @@ module Dispatcher (
           Vj = CDBDP_LSB_value;
         end
       end
+    end else begin
+      Vj= RFDP_Vj;
     end
     if (RFDP_Qk != NON_DEP) begin
       if(!RoBDP_Qk_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qk) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qk)) begin
-        //Qk is not ready
+        //Qk is really not ready
         Qk = RFDP_Qk;
         Vk = RFDP_Vk;
       end else begin
@@ -200,6 +177,8 @@ module Dispatcher (
           Vk = CDBDP_LSB_value;
         end
       end
+    end else begin
+      Vk = RFDP_Vk;
     end
   end
 
@@ -233,14 +212,35 @@ module Dispatcher (
         if (DCDP_en) begin  //instruction fetched
           state <= IDLE;
           DPDC_ask_IF <= 0;
-          DPRF_en <= 1;  //rd and RoB index sent to RoB is valid now!
-          DPRoB_en <= 1;  //pc, opcode, predict_result, rd sent to RoB is valid now!
+          DPRF_en <= 1;  //sent rd and RoB index to RF
+          DPRF_rd <= (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu || DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? NON_REG : DCDP_rd;
+          DPRF_RoB_index <= RoBDP_RoB_index;
+          DPRoB_en <= 1;  // pc, opcode, predict_result, rd  to RoB
+          DPRoB_pc <= DCDP_pc;
+          DPRoB_opcode <= DCDP_opcode;
+          DPRoB_predict_result <= DCDP_predict_result;
+          DPRoB_rd <= (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu || DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? NON_REG : DCDP_rd;
           if(DCDP_opcode == lb || DCDP_opcode == lh || DCDP_opcode == lw || DCDP_opcode == lbu || DCDP_opcode == lhu || DCDP_opcode == sw || DCDP_opcode == sh || DCDP_opcode == sb) begin
-            DPLSB_en <= 1;  //opcode, imm, Qj, Qk, Vj, Vk sent to LSB is valid now!
-            DPRS_en  <= 0;
+            DPLSB_en <= 1;  // opcode, imm, Qj, Qk, Vj, Vk to LSB
+            DPRS_en <= 0;
+            DPLSB_RoB_index <= RoBDP_RoB_index;
+            DPLSB_Qj <= Qj;
+            DPLSB_Qk <= Qk;
+            DPLSB_Vj <= Vj;
+            DPLSB_Vk <= Vk;
+            DPLSB_opcode <= DCDP_opcode;
+            DPLSB_imm <= DCDP_imm;
           end else begin
             DPLSB_en <= 0;
-            DPRS_en  <= 1;  //pc, opcode, imm, Qj, Qk, Vj, Vk sent to RS is valid now!
+            DPRS_en <= 1;  //sent pc, opcode, imm, Qj, Qk, Vj, Vk  to RS
+            DPRS_RoB_index <= RoBDP_RoB_index;
+            DPRS_pc <= DCDP_pc;
+            DPRS_Qj <= Qj;
+            DPRS_Qk <= Qk;
+            DPRS_Vj <= Vj;
+            DPRS_Vk <= Vk;
+            DPRS_imm <= DCDP_imm;
+            DPRS_opcode <= DCDP_opcode;
           end
         end
       end

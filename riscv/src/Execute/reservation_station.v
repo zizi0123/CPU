@@ -21,7 +21,7 @@ module ReservationStation (
     input wire [RoB_WIDTH - 1:0] CDBRS_LSB_RoB_index,
     input wire [31:0] CDBRS_LSB_value,
     output reg RSCDB_en,
-    output wire [RoB_WIDTH - 1:0] RSCDB_RoB_index,
+    output reg [RoB_WIDTH - 1:0] RSCDB_RoB_index,
     output reg [31:0] RSCDB_value,  //rd value or branch result(jump or not)
     output reg [ADDR_WIDTH - 1:0] RSCDB_next_pc,
 
@@ -103,7 +103,6 @@ module ReservationStation (
   assign idle_head = (!busy[0]) ? 0 : (!busy[1]) ? 1 : (!busy[2]) ? 2 : (!busy[3]) ? 3 : (!busy[4]) ? 4 : (!busy[5]) ? 5 : (!busy[6]) ? 6 : (!busy[7]) ? 7 : 8;
   assign ready_head = (ready[0]) ? 0 : (ready[1]) ? 1 : (ready[2]) ? 2 : (ready[3]) ? 3 : (ready[4]) ? 4 : (ready[5]) ? 5 : (ready[6]) ? 6 : (ready[7]) ? 7 : 8;
   assign RSDP_full = idle_head == RS_SIZE;
-  assign RSCDB_RoB_index = ready_head == RS_SIZE ? 0 : RoB_index[ready_head];
 
 
   integer j;
@@ -181,6 +180,7 @@ module ReservationStation (
       end
       if (ready_head != RS_SIZE) begin  //send a ready instruction to CDB at posedge
         RSCDB_en <= 1;
+        RSCDB_RoB_index <= RoB_index[ready_head];
         busy[ready_head] <= 0;
         case (opcode[ready_head])
           lui: begin

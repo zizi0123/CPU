@@ -13,7 +13,7 @@ module ReorderBuffer (
     input wire [6:0] DPRoB_opcode,
     input wire [EX_REG_WIDTH - 1:0] DPRoB_rd,
     output wire RoBDP_full,
-    output wire [RoB_WIDTH - 1:0] RoBDP_RoB_index,
+    output wire [RoB_WIDTH - 1:0] RoBDP_RoB_index,  //the next instruction's RoB index
     output wire RoBDP_pre_judge,  //0:mispredict 1:correct
     output wire RoBDP_Qj_ready,  //RoB item Qj is ready in RoB
     output wire RoBDP_Qk_ready,  //RoB item Qk is ready in RoB
@@ -32,9 +32,9 @@ module ReorderBuffer (
     output wire RoBRS_pre_judge,
 
     //LoadStoreBuffer
-    input wire [RoB_WIDTH - 1:0] LSBRoB_commit_index,  //the last committed store instruction in LSB
+    input wire [EX_RoB_WIDTH - 1:0] LSBRoB_commit_index,  //the last committed store instruction in LSB
     output wire RoBLSB_pre_judge,
-    output wire RoBLSB_commit_index,
+    output wire [RoB_WIDTH - 1:0] RoBLSB_commit_index,
 
     //CDB
     input wire CDBRoB_RS_en,
@@ -114,7 +114,7 @@ module ReorderBuffer (
   reg busy[RoB_SIZE - 1:0];
   reg state[RoB_SIZE - 1:0];
   reg [RoB_WIDTH -1 : 0] front;
-  reg [RoB_WIDTH -1 : 0] rear;
+  reg [RoB_WIDTH -1 : 0] rear;  //rear points to en empty item,the next item to be filled
   reg [RoB_WIDTH -1 : 0] commit_front;  //the last committed instruction in RoB
   reg pre_judge;
   wire front_type;
@@ -122,7 +122,7 @@ module ReorderBuffer (
   assign front_type = (busy[front] && (opcode[front] == beq || opcode[front] == bne || opcode[front] == blt || opcode[front] == bge || opcode[front] == bltu || opcode[front] == bgeu)) ? BRANCH : (busy[front] && opcode[front] == jalr) ? JALR : OTHER;
 
   //Dispatcher
-  assign RoBDP_full = (rear == front);
+  assign RoBDP_full = ((rear + 1) % RoB_SIZE == front);
   assign RoBDP_RoB_index = rear;
   assign RoBDP_pre_judge = pre_judge;
   assign RoBDP_Qj_ready = (DPRoB_Qj == NON_DEP || state[DPRoB_Qj] == READY);
@@ -185,7 +185,7 @@ module ReorderBuffer (
         state[CDBRoB_LSB_RoB_index] <= READY;
         value[CDBRoB_LSB_RoB_index] <= CDBRoB_LSB_value;
       end
-      
+
       //LoadStore Buffer
       if (LSBRoB_commit_index == front) begin  //store instruction has been committed to mem in LSB
         busy[front] <= 0;
@@ -223,7 +223,7 @@ module ReorderBuffer (
         RoBIF_next_pc <= next_pc[front];
       end else begin
         RoBIF_branch_en <= 0;
-        pre_judge <= 0;
+        pre_judge <= 1;
       end
     end
   end

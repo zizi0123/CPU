@@ -38,7 +38,7 @@ module cpu (
   // - 0x30000 read: read a byte from input
   // - 0x30000 write: write a byte to output (write 0x00 is ignored)
   // - 0x30004 read: read clocks passed since cpu starts (in dword, 4 bytes)
-  // - 0x30004 write: indicates program stop (will output '\0' through uart tx)
+  // - 0x30004 write: indicates program stop (will output '\0' through uart tx)\
 
   parameter BLOCK_WIDTH = 1;  //a block has 2^1 instructions
   parameter BLOCK_SIZE = 1 << BLOCK_WIDTH;
@@ -61,9 +61,9 @@ module cpu (
   //MemCtrller
   wire MCIC_en;
   wire [32 * BLOCK_SIZE - 1:0] MCIC_block;
-  wire MCLSB_en;
-  wire [7:0] MCLSB_data;
-  wire [1:0] MCLSB_data_number;
+  wire MCLSB_w_en;
+  wire MCLSB_r_en;
+  wire [31:0] MCLSB_data;
 
   //ICache
   wire ICMC_en;
@@ -127,7 +127,6 @@ module cpu (
   wire [EX_RoB_WIDTH - 1:0] DPRoB_Qk;  //prefetch:ask if Qk is ready in RoB
   wire DPRoB_en;  //send a new instruction to RoB
   wire [ADDR_WIDTH - 1:0] DPRoB_pc;
-  wire [31:0] DPRoB_imm;
   wire DPRoB_predict_result;
   wire [6:0] DPRoB_opcode;
   wire [EX_REG_WIDTH - 1:0] DPRoB_rd;
@@ -149,7 +148,7 @@ module cpu (
   wire LSBCDB_en;
   wire [RoB_WIDTH - 1:0] LSBCDB_RoB_index;
   wire [31:0] LSBCDB_value;
-  wire [RoB_WIDTH - 1:0] LSBRoB_commit_index;  //the last committed store instructi
+  wire [EX_RoB_WIDTH - 1:0] LSBRoB_commit_index;  //the last committed store instructi
 
   //Reorder Buffer
   wire RoBDP_full;
@@ -167,7 +166,7 @@ module cpu (
   wire [ADDR_WIDTH - 1:0] RoBIF_next_pc;  //the pc of the next instruction for jalr/wrong prediction
   wire RoBRS_pre_judge;
   wire RoBLSB_pre_judge;
-  wire RoBLSB_commit_index;
+  wire [RoB_WIDTH - 1:0] RoBLSB_commit_index;
   wire RoBRF_pre_judge;
   wire RoBRF_en;  //commit a new instruction; RoB index;rd;value is valid now!
   wire [RoB_WIDTH - 1:0] RoBRF_RoB_index;
@@ -175,8 +174,8 @@ module cpu (
   wire [31:0] RoBRF_value;
 
   //Register File
-  wire [EX_REG_WIDTH - 1:0] RFDP_Qj;
-  wire [EX_REG_WIDTH - 1:0] RFDP_Qk;
+  wire [EX_RoB_WIDTH - 1:0] RFDP_Qj;
+  wire [EX_RoB_WIDTH - 1:0] RFDP_Qk;
   wire [31:0] RFDP_Vj;
   wire [31:0] RFDP_Vk;
 
@@ -191,7 +190,7 @@ module cpu (
 
   wire CDBRoB_RS_en;
   wire [RoB_WIDTH - 1:0] CDBRoB_RS_RoB_index;
-  wire [31:0] CDBRoB_RS_value;  
+  wire [31:0] CDBRoB_RS_value;
   wire [ADDR_WIDTH - 1:0] CDBRoB_RS_next_pc;
   wire CDBRoB_LSB_en;
   wire [RoB_WIDTH - 1:0] CDBRoB_LSB_RoB_index;
@@ -205,302 +204,356 @@ module cpu (
   wire [31:0] CDBDP_LSB_value;
 
   //MemCtrl
-  MemController mem_controller(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  MemController mem_controller (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .RAMMC_data(mem_din),
-    .io_buffer_full(io_buffer_full),
-    .MCRAM_data(mem_dout),
-    .MCRAM_addr(mem_a),
-    .MCRAM_wr(mem_wr),
+      .RAMMC_data(mem_din),
+      .io_buffer_full(io_buffer_full),
+      .MCRAM_data(mem_dout),
+      .MCRAM_addr(mem_a),
+      .MCRAM_wr(mem_wr),
 
-    .ICMC_en(ICMC_en),
-    .ICMC_addr(ICMC_addr),
-    .MCIC_en(MCIC_en),
-    .MCIC_block(MCIC_block),
+      .ICMC_en(ICMC_en),
+      .ICMC_addr(ICMC_addr),
+      .MCIC_en(MCIC_en),
+      .MCIC_block(MCIC_block),
 
-    .LSBMC_en(LSBMC_en),
-    .LSBMC_wr(LSBMC_wr),
-    .LSBMC_data_width(LSBMC_data_width),
-    .LSBMC_data(LSBMC_data),
-    .LSBMC_addr(LSBMC_addr),
-    .MCLSB_en(MCLSB_en),
-    .MCLSB_data(MCLSB_data),
-    .MCLSB_data_number(MCLSB_data_number)
+      .LSBMC_en(LSBMC_en),
+      .LSBMC_wr(LSBMC_wr),
+      .LSBMC_data_width(LSBMC_data_width),
+      .LSBMC_data(LSBMC_data),
+      .LSBMC_addr(LSBMC_addr),
+      .MCLSB_r_en(MCLSB_r_en),
+      .MCLSB_w_en(MCLSB_w_en),
+      .MCLSB_data(MCLSB_data)
   );
 
   //ICache
-  ICache ins_cache(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  ICache ins_cache (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .MCIC_en(MCIC_en),
-    .MCIC_block(MCIC_block),
-    .ICMC_en(ICMC_en),
-    .ICMC_addr(ICMC_addr),
+      .MCIC_en(MCIC_en),
+      .MCIC_block(MCIC_block),
+      .ICMC_en(ICMC_en),
+      .ICMC_addr(ICMC_addr),
 
-    .IFIC_en(IFIC_en),
-    .IFIC_addr(IFIC_addr),
-    .ICIF_en(ICIF_en),
-    .ICIF_data(ICIF_data)
+      .IFIC_en  (IFIC_en),
+      .IFIC_addr(IFIC_addr),
+      .ICIF_en  (ICIF_en),
+      .ICIF_data(ICIF_data)
   );
 
   //Instruction Fetcher
-  InstructionFetcher instruction_fetcher(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  InstructionFetcher instruction_fetcher (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .ICIF_en(ICIF_en),
-    .ICIF_data(ICIF_data),
-    .IFIC_en(IFIC_en),
-    .IFIC_addr(IFIC_addr),
+      .ICIF_en  (ICIF_en),
+      .ICIF_data(ICIF_data),
+      .IFIC_en  (IFIC_en),
+      .IFIC_addr(IFIC_addr),
 
-    .DCIF_ask_IF(DCIF_ask_IF),
-    .IFDC_en(IFDC_en),
-    .IFDC_pc(IFDC_pc),
-    .IFDC_opcode(IFDC_opcode),
-    .IFDC_remain_inst(IFDC_remain_inst),
-    .IFDC_predict_result(IFDC_predict_result),
+      .DCIF_ask_IF(DCIF_ask_IF),
+      .IFDC_en(IFDC_en),
+      .IFDC_pc(IFDC_pc),
+      .IFDC_opcode(IFDC_opcode),
+      .IFDC_remain_inst(IFDC_remain_inst),
+      .IFDC_predict_result(IFDC_predict_result),
 
-    .PDIF_predict_result(PDIF_predict_result),
-    .IFPD_predict_en(IFPD_predict_en),
-    .IFPD_pc(IFPD_pc),
-    .IFPD_feedback_en(IFPD_feedback_en),
-    .IFPD_branch_result(IFPD_branch_result),
-    .IFPD_feedback_pc(IFPD_feedback_pc),
+      .PDIF_predict_result(PDIF_predict_result),
+      .IFPD_predict_en(IFPD_predict_en),
+      .IFPD_pc(IFPD_pc),
+      .IFPD_feedback_en(IFPD_feedback_en),
+      .IFPD_branch_result(IFPD_branch_result),
+      .IFPD_feedback_pc(IFPD_feedback_pc),
 
-    .RoBIF_jalr_en(RoBIF_jalr_en),
-    .RoBIF_branch_en(RoBIF_branch_en),
-    .RoBIF_pre_judge(RoBIF_pre_judge),
-    .RoBIF_branch_result(RoBIF_branch_result),
-    .RoBIF_branch_pc(RoBIF_branch_pc),
-    .RoBIF_next_pc(RoBIF_next_pc)
+      .RoBIF_jalr_en(RoBIF_jalr_en),
+      .RoBIF_branch_en(RoBIF_branch_en),
+      .RoBIF_pre_judge(RoBIF_pre_judge),
+      .RoBIF_branch_result(RoBIF_branch_result),
+      .RoBIF_branch_pc(RoBIF_branch_pc),
+      .RoBIF_next_pc(RoBIF_next_pc)
   );
 
 
   //Predictor
-  Predictor predictor(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  Predictor predictor (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .IFPD_predict_en(IFPD_predict_en),
-    .IFPD_pc(IFPD_pc),
-    .IFPD_feedback_en(IFPD_feedback_en),
-    .IFPD_branch_result(IFPD_branch_result),
-    .IFPD_feedback_pc(IFPD_feedback_pc),
-    .PDIF_predict_result(PDIF_predict_result)
+      .IFPD_predict_en(IFPD_predict_en),
+      .IFPD_pc(IFPD_pc),
+      .IFPD_feedback_en(IFPD_feedback_en),
+      .IFPD_branch_result(IFPD_branch_result),
+      .IFPD_feedback_pc(IFPD_feedback_pc),
+      .PDIF_predict_result(PDIF_predict_result)
   );
 
   //Decoder
-  Decoder decoder(
-    .IFDC_en(IFDC_en),
-    .IFDC_pc(IFDC_pc),
-    .IFDC_opcode(IFDC_opcode),
-    .IFDC_remain_inst(IFDC_remain_inst),
-    .IFDC_predict_result(IFDC_predict_result),
-    .DCIF_ask_IF(DCIF_ask_IF),
+  Decoder decoder (
+      .IFDC_en(IFDC_en),
+      .IFDC_pc(IFDC_pc),
+      .IFDC_opcode(IFDC_opcode),
+      .IFDC_remain_inst(IFDC_remain_inst),
+      .IFDC_predict_result(IFDC_predict_result),
+      .DCIF_ask_IF(DCIF_ask_IF),
 
-    .DPDC_ask_IF(DPDC_ask_IF),
-    .DCDP_en(DCDP_en),
-    .DCDP_pc(DCDP_pc),
-    .DCDP_opcode(DCDP_opcode),
-    .DCDP_rs1(DCDP_rs1),
-    .DCDP_rs2(DCDP_rs2),
-    .DCDP_rd(DCDP_rd),
-    .DCDP_imm(DCDP_imm),
-    .DCDP_predict_result(DCDP_predict_result)
+      .DPDC_ask_IF(DPDC_ask_IF),
+      .DCDP_en(DCDP_en),
+      .DCDP_pc(DCDP_pc),
+      .DCDP_opcode(DCDP_opcode),
+      .DCDP_rs1(DCDP_rs1),
+      .DCDP_rs2(DCDP_rs2),
+      .DCDP_rd(DCDP_rd),
+      .DCDP_imm(DCDP_imm),
+      .DCDP_predict_result(DCDP_predict_result)
   );
 
   //Dispatcher
-  Dispatcher dispatcher(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  Dispatcher dispatcher (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .DCDP_en(DCDP_en),
-    .DCDP_pc(DCDP_pc),
-    .DCDP_opcode(DCDP_opcode),
-    .DCDP_rs1(DCDP_rs1),
-    .DCDP_rs2(DCDP_rs2),
-    .DCDP_rd(DCDP_rd),
-    .DCDP_imm(DCDP_imm),
-    .DCDP_predict_result(DCDP_predict_result),
+      .DCDP_en(DCDP_en),
+      .DCDP_pc(DCDP_pc),
+      .DCDP_opcode(DCDP_opcode),
+      .DCDP_rs1(DCDP_rs1),
+      .DCDP_rs2(DCDP_rs2),
+      .DCDP_rd(DCDP_rd),
+      .DCDP_imm(DCDP_imm),
+      .DCDP_predict_result(DCDP_predict_result),
+      .DPDC_ask_IF(DPDC_ask_IF),
 
-    .CDBDP_RS_en(CDBDP_RS_en),
-    .CDBDP_RS_RoB_index(CDBDP_RS_RoB_index),
-    .CDBDP_RS_value(CDBDP_RS_value),
-    .CDBDP_LSB_en(CDBDP_LSB_en),
-    .CDBDP_LSB_RoB_index(CDBDP_LSB_RoB_index),
-    .CDBDP_LSB_value(CDBDP_LSB_value)
+      .RFDP_Qj(RFDP_Qj),
+      .RFDP_Qk(RFDP_Qk),
+      .RFDP_Vj(RFDP_Vj),
+      .RFDP_Vk(RFDP_Vk),
+      .DPRF_en(DPRF_en),
+      .DPRF_rs1(DPRF_rs1),
+      .DPRF_rs2(DPRF_rs2),
+      .DPRF_RoB_index(DPRF_RoB_index),
+      .DPRF_rd(DPRF_rd),
+
+      .RSDP_full(RSDP_full),
+      .DPRS_en(DPRS_en),
+      .DPRS_pc(DPRS_pc),
+      .DPRS_Qj(DPRS_Qj),
+      .DPRS_Qk(DPRS_Qk),
+      .DPRS_Vj(DPRS_Vj),
+      .DPRS_Vk(DPRS_Vk),
+      .DPRS_imm(DPRS_imm),
+      .DPRS_opcode(DPRS_opcode),
+      .DPRS_RoB_index(DPRS_RoB_index),
+
+      .LSBDP_full(LSBDP_full),
+      .DPLSB_en(DPLSB_en),
+      .DPLSB_Qj(DPLSB_Qj),
+      .DPLSB_Qk(DPLSB_Qk),
+      .DPLSB_Vj(DPLSB_Vj),
+      .DPLSB_Vk(DPLSB_Vk),
+      .DPLSB_imm(DPLSB_imm),
+      .DPLSB_opcode(DPLSB_opcode),
+      .DPLSB_RoB_index(DPLSB_RoB_index),
+
+      .RoBDP_full(RoBDP_full),
+      .RoBDP_RoB_index(RoBDP_RoB_index),
+      .RoBDP_Qj_ready(RoBDP_Qj_ready),
+      .RoBDP_Qk_ready(RoBDP_Qk_ready),
+      .RoBDP_Vj(RoBDP_Vj),
+      .RoBDP_Vk(RoBDP_Vk),
+      .RoBDP_pre_judge(RoBDP_pre_judge),
+      .DPRoB_Qj(DPRoB_Qj),
+      .DPRoB_Qk(DPRoB_Qk),
+      .DPRoB_en(DPRoB_en),
+      .DPRoB_pc(DPRoB_pc),
+      .DPRoB_predict_result(DPRoB_predict_result),
+      .DPRoB_opcode(DPRoB_opcode),
+      .DPRoB_rd(DPRoB_rd),
+
+      .CDBDP_RS_en(CDBDP_RS_en),
+      .CDBDP_RS_RoB_index(CDBDP_RS_RoB_index),
+      .CDBDP_RS_value(CDBDP_RS_value),
+      .CDBDP_LSB_en(CDBDP_LSB_en),
+      .CDBDP_LSB_RoB_index(CDBDP_LSB_RoB_index),
+      .CDBDP_LSB_value(CDBDP_LSB_value)
   );
 
   //Register File
-  RegisterFile register_file(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  RegisterFile register_file (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .DPRF_en(DPRF_en),
-    .DPRF_rs1(DPRF_rs1),
-    .DPRF_rs2(DPRF_rs2),
-    .DPRF_RoB_index(DPRF_RoB_index),
-    .DPRF_rd(DPRF_rd),
-    .RFDP_Qj(RFDP_Qj),
-    .RFDP_Qk(RFDP_Qk),
-    .RFDP_Vj(RFDP_Vj),
-    .RFDP_Vk(RFDP_Vk),
+      .DPRF_en(DPRF_en),
+      .DPRF_rs1(DPRF_rs1),
+      .DPRF_rs2(DPRF_rs2),
+      .DPRF_RoB_index(DPRF_RoB_index),
+      .DPRF_rd(DPRF_rd),
+      .RFDP_Qj(RFDP_Qj),
+      .RFDP_Qk(RFDP_Qk),
+      .RFDP_Vj(RFDP_Vj),
+      .RFDP_Vk(RFDP_Vk),
 
-    .RoBRF_pre_judge(RoBRF_pre_judge),
-    .RoBRF_en(RoBRF_en),
-    .RoBRF_RoB_index(RoBRF_RoB_index),
-    .RoBRF_rd(RoBRF_rd),
-    .RoBRF_value(RoBRF_value)
+      .RoBRF_pre_judge(RoBRF_pre_judge),
+      .RoBRF_en(RoBRF_en),
+      .RoBRF_RoB_index(RoBRF_RoB_index),
+      .RoBRF_rd(RoBRF_rd),
+      .RoBRF_value(RoBRF_value)
   );
 
   //Reservation Station
-  ReservationStation reservation_station(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  ReservationStation reservation_station (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .DPRS_en(DPRS_en),
-    .DPRS_pc(DPRS_pc),
-    .DPRS_Qj(DPRS_Qj),
-    .DPRS_Qk(DPRS_Qk),
-    .DPRS_Vj(DPRS_Vj),
-    .DPRS_Vk(DPRS_Vk),
-    .DPRS_imm(DPRS_imm),
-    .DPRS_opcode(DPRS_opcode),
-    .DPRS_RoB_index(DPRS_RoB_index),
-    .RSDP_full(RSDP_full),
+      .DPRS_en(DPRS_en),
+      .DPRS_pc(DPRS_pc),
+      .DPRS_Qj(DPRS_Qj),
+      .DPRS_Qk(DPRS_Qk),
+      .DPRS_Vj(DPRS_Vj),
+      .DPRS_Vk(DPRS_Vk),
+      .DPRS_imm(DPRS_imm),
+      .DPRS_opcode(DPRS_opcode),
+      .DPRS_RoB_index(DPRS_RoB_index),
+      .RSDP_full(RSDP_full),
 
-    .CDBRS_LSB_en(CDBRS_LSB_en),
-    .CDBRS_LSB_RoB_index(CDBRS_LSB_RoB_index),
-    .CDBRS_LSB_value(CDBRS_LSB_value),
-    .RSCDB_en(RSCDB_en),
-    .RSCDB_RoB_index(RSCDB_RoB_index),
-    .RSCDB_value(RSCDB_value),
-    .RSCDB_next_pc(RSCDB_next_pc),
+      .CDBRS_LSB_en(CDBRS_LSB_en),
+      .CDBRS_LSB_RoB_index(CDBRS_LSB_RoB_index),
+      .CDBRS_LSB_value(CDBRS_LSB_value),
+      .RSCDB_en(RSCDB_en),
+      .RSCDB_RoB_index(RSCDB_RoB_index),
+      .RSCDB_value(RSCDB_value),
+      .RSCDB_next_pc(RSCDB_next_pc),
 
-    .RoBRS_pre_judge(RoBRS_pre_judge)
+      .RoBRS_pre_judge(RoBRS_pre_judge)
   );
 
   //Reorder Buffer
-  ReorderBuffer reorder_buffer(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  ReorderBuffer reorder_buffer (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .DPRoB_Qj(DPRoB_Qj),
-    .DPRoB_Qk(DPRoB_Qk),
-    .DPRoB_en(DPRoB_en),
-    .DPRoB_pc(DPRoB_pc),
-    .DPRoB_predict_result(DPRoB_predict_result),
-    .DPRoB_opcode(DPRoB_opcode),
-    .DPRoB_rd(DPRoB_rd),
-    .RoBDP_full(DPRP_full),
-    .RoBDP_RoB_index(RoBDP_RoB_index),
-    .RoBDP_pre_judge(RoBDP_pre_judge),
-    .RoBDP_Qj_ready(RoBDP_Qj_ready),
-    .RoBDP_Qk_ready(RoBDP_Qk_ready),
-    .RoBDP_Vj(RoBDP_Vj),
-    .RoBDP_Vk(RoBDP_Vk),
+      .DPRoB_Qj(DPRoB_Qj),
+      .DPRoB_Qk(DPRoB_Qk),
+      .DPRoB_en(DPRoB_en),
+      .DPRoB_pc(DPRoB_pc),
+      .DPRoB_predict_result(DPRoB_predict_result),
+      .DPRoB_opcode(DPRoB_opcode),
+      .DPRoB_rd(DPRoB_rd),
+      .RoBDP_full(RoBDP_full),
+      .RoBDP_RoB_index(RoBDP_RoB_index),
+      .RoBDP_pre_judge(RoBDP_pre_judge),
+      .RoBDP_Qj_ready(RoBDP_Qj_ready),
+      .RoBDP_Qk_ready(RoBDP_Qk_ready),
+      .RoBDP_Vj(RoBDP_Vj),
+      .RoBDP_Vk(RoBDP_Vk),
 
-    .RoBIF_jalr_en(RoBIF_jalr_en),
-    .RoBIF_branch_en(RoBIF_branch_en),
-    .RoBIF_pre_judge(RoBIF_pre_judge),
-    .RoBIF_branch_result(RoBIF_branch_result),
-    .RoBIF_branch_pc(RoBIF_branch_pc),
-    .RoBIF_next_pc(RoBIF_next_pc),
+      .RoBIF_jalr_en(RoBIF_jalr_en),
+      .RoBIF_branch_en(RoBIF_branch_en),
+      .RoBIF_pre_judge(RoBIF_pre_judge),
+      .RoBIF_branch_result(RoBIF_branch_result),
+      .RoBIF_branch_pc(RoBIF_branch_pc),
+      .RoBIF_next_pc(RoBIF_next_pc),
 
-    .RoBRS_pre_judge(RoBRS_pre_judge),
+      .RoBRS_pre_judge(RoBRS_pre_judge),
 
-    .LSBRoB_commit_index(LSBRoB_commit_index),
-    .RoBLSB_pre_judge(RoBLSB_pre_judge),
-    .RoBLSB_commit_index(RoBLSB_commit_index),
+      .LSBRoB_commit_index(LSBRoB_commit_index),
+      .RoBLSB_pre_judge(RoBLSB_pre_judge),
+      .RoBLSB_commit_index(RoBLSB_commit_index),
 
-    .CDBRoB_RS_en(CDBRoB_RS_en),
-    .CDBRoB_RS_RoB_index(CDBRoB_RS_RoB_index),
-    .CDBRoB_RS_value(CDBRoB_RS_value),
-    .CDBRoB_RS_next_pc(CDBRoB_RS_next_pc),
-    .CDBRoB_LSB_en(CDBRoB_LSB_en),
-    .CDBRoB_LSB_RoB_index(CDBRoB_LSB_RoB_index),
-    .CDBRoB_LSB_value(CDBRoB_LSB_value),
+      .CDBRoB_RS_en(CDBRoB_RS_en),
+      .CDBRoB_RS_RoB_index(CDBRoB_RS_RoB_index),
+      .CDBRoB_RS_value(CDBRoB_RS_value),
+      .CDBRoB_RS_next_pc(CDBRoB_RS_next_pc),
+      .CDBRoB_LSB_en(CDBRoB_LSB_en),
+      .CDBRoB_LSB_RoB_index(CDBRoB_LSB_RoB_index),
+      .CDBRoB_LSB_value(CDBRoB_LSB_value),
 
-    .RoBRF_pre_judge(RoBRF_pre_judge),
-    .RoBRF_en(RoBRF_en),
-    .RoBRF_RoB_index(RoBRF_RoB_index),
-    .RoBRF_rd(RoBRF_rd),
-    .RoBRF_value(RoBRF_value)
+      .RoBRF_pre_judge(RoBRF_pre_judge),
+      .RoBRF_en(RoBRF_en),
+      .RoBRF_RoB_index(RoBRF_RoB_index),
+      .RoBRF_rd(RoBRF_rd),
+      .RoBRF_value(RoBRF_value)
   );
 
 
   //Load Store Buffer
-  LoadStoreBuffer load_store_buffer(
-    .Sys_clk(clk_in),
-    .Sys_rst(rst_in),
-    .Sys_rdy(rdy_in),
+  LoadStoreBuffer load_store_buffer (
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
-    .DPLSB_en(DPLSB_en),
-    .DPLSB_Qj(DPLSB_Qj),
-    .DPLSB_Qk(DPLSB_Qk),
-    .DPLSB_Vj(DPLSB_Vj),
-    .DPLSB_Vk(DPLSB_Vk),
-    .DPLSB_imm(DPLSB_imm),
-    .DPLSB_opcode(DPLSB_opcode),
-    .DPLSB_RoB_index(DPLSB_RoB_index),
-    .LSBDP_full(LSBDP_full),
+      .DPLSB_en(DPLSB_en),
+      .DPLSB_Qj(DPLSB_Qj),
+      .DPLSB_Qk(DPLSB_Qk),
+      .DPLSB_Vj(DPLSB_Vj),
+      .DPLSB_Vk(DPLSB_Vk),
+      .DPLSB_imm(DPLSB_imm),
+      .DPLSB_opcode(DPLSB_opcode),
+      .DPLSB_RoB_index(DPLSB_RoB_index),
+      .LSBDP_full(LSBDP_full),
 
-    .MCLSB_en(MCLSB_en),
-    .MCLSB_data(MCLSB_data),
-    .MCLSB_data_number(MCLSB_data_number),
-    .LSBMC_en(LSBMC_en),
-    .LSBMC_wr(LSBMC_wr),
-    .LSBMC_data_width(LSBMC_data_width),
-    .LSBMC_data(LSBMC_data),
-    .LSBMC_addr(LSBMC_addr),
+      .MCLSB_r_en(MCLSB_r_en),
+      .MCLSB_w_en(MCLSB_w_en),
+      .MCLSB_data(MCLSB_data),
+      .LSBMC_en(LSBMC_en),
+      .LSBMC_wr(LSBMC_wr),
+      .LSBMC_data_width(LSBMC_data_width),
+      .LSBMC_data(LSBMC_data),
+      .LSBMC_addr(LSBMC_addr),
 
-    .CDBLSB_RS_en(CDBLSB_RS_en),
-    .CDBLSB_RS_RoB_index(CDBLSB_RS_RoB_index),
-    .CDBLSB_RS_value(CDBLSB_RS_value),
-    .LSBCDB_en(LSBCDB_en),
-    .LSBCDB_RoB_index(LSBCDB_RoB_index),
-    .LSBCDB_value(LSBCDB_value),
+      .CDBLSB_RS_en(CDBLSB_RS_en),
+      .CDBLSB_RS_RoB_index(CDBLSB_RS_RoB_index),
+      .CDBLSB_RS_value(CDBLSB_RS_value),
+      .LSBCDB_en(LSBCDB_en),
+      .LSBCDB_RoB_index(LSBCDB_RoB_index),
+      .LSBCDB_value(LSBCDB_value),
 
-    .RoBLSB_pre_judge(RoBLSB_pre_judge),
-    .RoBLSB_commit_index(RoBLSB_commit_index),
-    .LSBRoB_commit_index(LSBRoB_commit_index)
+      .RoBLSB_pre_judge(RoBLSB_pre_judge),
+      .RoBLSB_commit_index(RoBLSB_commit_index),
+      .LSBRoB_commit_index(LSBRoB_commit_index)
   );
 
   //CDB
-  CDB cdb(
-    .RSCDB_en(RSCDB_en),
-    .RSCDB_RoB_index(RSCDB_RoB_index),
-    .RSCDB_value(RSCDB_value),
-    .RSCDB_next_pc(RSCDB_next_pc),
-    .CDBRS_LSB_en(CDBRS_LSB_en),
-    .CDBRS_LSB_RoB_index(CDBRS_LSB_RoB_index),
-    .CDBRS_LSB_value(CDBRS_LSB_value),
+  CDB cdb (
+      .RSCDB_en(RSCDB_en),
+      .RSCDB_RoB_index(RSCDB_RoB_index),
+      .RSCDB_value(RSCDB_value),
+      .RSCDB_next_pc(RSCDB_next_pc),
+      .CDBRS_LSB_en(CDBRS_LSB_en),
+      .CDBRS_LSB_RoB_index(CDBRS_LSB_RoB_index),
+      .CDBRS_LSB_value(CDBRS_LSB_value),
 
-    .LSBCDB_en(LSBCDB_en),
-    .LSBCDB_RoB_index(LSBCDB_RoB_index),
-    .LSBCDB_value(LSBCDB_value),
-    .CDBLSB_RS_en(CDBLSB_RS_en),
-    .CDBLSB_RS_RoB_index(CDBLSB_RS_RoB_index),
-    .CDBLSB_RS_value(CDBLSB_RS_value),
+      .LSBCDB_en(LSBCDB_en),
+      .LSBCDB_RoB_index(LSBCDB_RoB_index),
+      .LSBCDB_value(LSBCDB_value),
+      .CDBLSB_RS_en(CDBLSB_RS_en),
+      .CDBLSB_RS_RoB_index(CDBLSB_RS_RoB_index),
+      .CDBLSB_RS_value(CDBLSB_RS_value),
 
-    .CDBRoB_RS_en(CDBRoB_RS_en),
-    .CDBRoB_RS_RoB_index(CDBRoB_RS_RoB_index),
-    .CDBRoB_RS_value(CDBRoB_RS_value),
-    .CDBRoB_RS_next_pc(CDBRoB_RS_next_pc),
-    .CDBRoB_LSB_en(CDBRoB_LSB_en),
-    .CDBRoB_LSB_RoB_index(CDBRoB_LSB_RoB_index),
-    .CDBRoB_LSB_value(CDBRoB_LSB_value)
+      .CDBRoB_RS_en(CDBRoB_RS_en),
+      .CDBRoB_RS_RoB_index(CDBRoB_RS_RoB_index),
+      .CDBRoB_RS_value(CDBRoB_RS_value),
+      .CDBRoB_RS_next_pc(CDBRoB_RS_next_pc),
+      .CDBRoB_LSB_en(CDBRoB_LSB_en),
+      .CDBRoB_LSB_RoB_index(CDBRoB_LSB_RoB_index),
+      .CDBRoB_LSB_value(CDBRoB_LSB_value),
+
+      .CDBDP_RS_en(CDBDP_RS_en),
+      .CDBDP_RS_RoB_index(CDBDP_RS_RoB_index),
+      .CDBDP_RS_value(CDBDP_RS_value),
+      .CDBDP_LSB_en(CDBDP_LSB_en),
+      .CDBDP_LSB_RoB_index(CDBDP_LSB_RoB_index),
+      .CDBDP_LSB_value(CDBDP_LSB_value)
   );
 
 

@@ -10,8 +10,8 @@ module RegisterFile (
     input wire [EX_REG_WIDTH - 1:0] DPRF_rs2,
     input wire [RoB_WIDTH - 1:0] DPRF_RoB_index,  //the dependency RoB# of rd
     input wire [EX_REG_WIDTH - 1:0] DPRF_rd,
-    output wire [EX_REG_WIDTH - 1:0] RFDP_Qj,
-    output wire [EX_REG_WIDTH - 1:0] RFDP_Qk,
+    output wire [EX_RoB_WIDTH - 1:0] RFDP_Qj,
+    output wire [EX_RoB_WIDTH - 1:0] RFDP_Qk,
     output wire [31:0] RFDP_Vj,
     output wire [31:0] RFDP_Vk,
 

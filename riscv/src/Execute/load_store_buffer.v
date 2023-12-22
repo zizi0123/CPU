@@ -16,9 +16,9 @@ module LoadStoreBuffer (
     output wire LSBDP_full,
 
     //Mem controller
-    input MCLSB_en,
-    input [7:0] MCLSB_data,
-    input [1:0] MCLSB_data_number,
+    input MCLSB_r_en,
+    input MCLSB_w_en,
+    input [31:0] MCLSB_data,
     output reg LSBMC_en,
     output reg LSBMC_wr,  //0:read 1:write
     output reg [2:0] LSBMC_data_width,
@@ -35,8 +35,8 @@ module LoadStoreBuffer (
 
     //RoB
     input RoBLSB_pre_judge,
-    input RoBLSB_commit_index,  //the last committed instruction
-    output reg [RoB_WIDTH - 1:0] LSBRoB_commit_index  //the last committed store instruction in LSB
+    input [RoB_WIDTH - 1:0] RoBLSB_commit_index,  //the last committed instruction
+    output reg [EX_RoB_WIDTH - 1:0] LSBRoB_commit_index  //the last committed store instruction in LSB
 );
 
 
@@ -46,11 +46,12 @@ module LoadStoreBuffer (
   parameter NON_REG = 6'b100000;
   parameter RoB_WIDTH = 8;
   parameter EX_RoB_WIDTH = 9;
+  parameter RoB_SIZE = 1 << RoB_WIDTH;
   parameter LSB_WIDTH = 3;
   parameter EX_LSB_WIDTH = 4;
   parameter LSB_SIZE = 1 << LSB_WIDTH;
   parameter NON_DEP = 9'b100000000;  //no dependency
-  parameter UNSTART = 0,WAITING_MEM = 1,WAITING_COMMIT = 2; //0:unready or ready but haven't interacted with mem 1:waiting for memory controller 2:gotten data from memory controller,waiting for commit
+  parameter UNSTART = 0,WAITING_MEM = 1; //0:unready or ready but haven't interacted with mem 1:waiting for memory controller 
   parameter LOAD = 1, STORE = 0;
   parameter READ = 0, WRITE = 1;
 
@@ -92,7 +93,7 @@ module LoadStoreBuffer (
   parameter orr = 7'd36;
   parameter andd = 7'd37;
 
-  reg [RoB_WIDTH - 1:0] RoB_index [LSB_SIZE - 1:0];
+  reg [RoB_WIDTH - 1:0] RoB_index[LSB_SIZE - 1:0];
   reg [6:0] opcode[LSB_SIZE - 1:0];
   reg [31:0] Vj[LSB_SIZE - 1:0];
   reg [31:0] Vk[LSB_SIZE - 1:0];  //used for load data in LOAD instructions
@@ -103,11 +104,9 @@ module LoadStoreBuffer (
   reg busy[LSB_SIZE - 1:0];
   wire ready[LSB_SIZE - 1:0];
   wire front_type;  //1:load 0:store
-  wire mem_front_type;  //1:load 0:store
-  reg [1:0] state[LSB_SIZE - 1:0];  //state of a item in LSB. UNSTART:0,WAITING_MEM:1,WAITING_COMMIT:2
+  reg LSB_state[LSB_SIZE - 1:0];  //LSB_state of a item in LSB. UNSTART:0,WAITING_MEM:1
   reg [LSB_WIDTH - 1:0] front;
   reg [LSB_WIDTH - 1:0] rear;
-  reg [LSB_WIDTH - 1:0] mem_front;
 
   //update ready signal immediately
   genvar i;
@@ -118,9 +117,8 @@ module LoadStoreBuffer (
     end
   endgenerate
 
-  assign LSBDP_full = (rear == front);
-  assign front_type = (opcode[front] == lb) || (opcode[front] == lh) || (opcode[front] == lw) || (opcode[front] == lbu) || (opcode[front] == lhu);
-  assign mem_front_type = (opcode[mem_front] == lb) || (opcode[mem_front] == lh) || (opcode[mem_front] == lw) || (opcode[mem_front] == lbu) || (opcode[mem_front] == lhu) || (opcode[mem_front] == sb) || (opcode[mem_front] == sh) || (opcode[mem_front] == sw);
+  assign LSBDP_full = ((rear + 1) % LSB_SIZE == front);
+  assign front_type = ((opcode[front] == lb) || (opcode[front] == lh) || (opcode[front] == lw) || (opcode[front] == lbu) || (opcode[front] == lhu)) ? LOAD : STORE;
 
   integer j;
 
@@ -151,15 +149,23 @@ module LoadStoreBuffer (
     end
   end
 
+  always @(MCLSB_w_en or MCLSB_r_en) begin //update MCLSB_en immediately when memory controller finish a request
+    if (LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
+      LSBMC_en <= 0;
+    end
+  end
+
   always @(posedge Sys_clk) begin
     if (Sys_rst || !RoBLSB_pre_judge) begin
       for (j = 0; j < LSB_SIZE; ++j) begin
         busy[j] <= 0;
-        state[j] <= 0;
+        LSB_state[j] <= 0;
         front <= 0;
         rear <= 0;
-        mem_front <= 0;
       end
+      LSBMC_en <= 0;
+      LSBCDB_en <= 0;
+      LSBRoB_commit_index <= RoB_SIZE;
     end else if (Sys_rdy) begin
       // sent a new instruction to load store buffer at posedge
       if (DPLSB_en && !LSBDP_full) begin
@@ -197,101 +203,69 @@ module LoadStoreBuffer (
         opcode[rear] <= DPLSB_opcode;
         busy[rear] <= 1;
         imm[rear] <= DPLSB_imm;
-        state[rear] <= 0;
+        LSB_state[rear] <= UNSTART;
         rear <= (rear + 1) % LSB_SIZE;
       end
 
       // sent to CDB or write to memory
       if (busy[front]) begin
-        if (state[front] == WAITING_COMMIT) begin  
-          if (front_type == LOAD) begin  //LOAD, send to CDB
+        if (LSB_state[front] == UNSTART) begin
+          LSBCDB_en <= 0;
+          if (ready[front]) begin
+            if (front_type == LOAD) begin
+              LSBMC_en <= 1;
+              LSBMC_wr <= READ;
+              LSBMC_data_width <= (opcode[front] == lb || opcode[front] == lbu) ? 1 : (opcode[front] == lh || opcode[front] == lhu) ? 2 : 4;
+              LSBMC_addr <= address[front];
+              LSB_state[front] <= WAITING_MEM;
+            end else begin  //STORE
+              if (RoBLSB_commit_index + 1 == RoB_index[front]) begin  //commit, write to memory
+                LSBMC_en <= 1;
+                LSBMC_wr <= WRITE;
+                case (opcode[front])
+                  sb: begin
+                    LSBMC_data <= Vk[front][7:0];
+                    LSBMC_data_width <= 1;
+                  end
+                  sh: begin
+                    LSBMC_data <= Vk[front][15:0];
+                    LSBMC_data_width <= 2;
+                  end
+                  default: begin
+                    LSBMC_data <= Vk[front];
+                    LSBMC_data_width <= 4;
+                  end
+                endcase
+                LSBMC_addr <= address[front];
+                LSB_state[front] <= WAITING_MEM;
+              end
+            end
+          end
+        end else if (LSB_state[front] == WAITING_MEM) begin
+          if (MCLSB_w_en) begin
+            busy[front] <= 0;
+            LSB_state[front] <= UNSTART;
+            LSBRoB_commit_index <= RoB_index[front];
+            front <= (front + 1) % LSB_SIZE;
+            LSBCDB_en <= 0;
+          end else if (MCLSB_r_en) begin  //load finished
+            busy[front] <= 0;
+            LSB_state[front] <= UNSTART;
+            front <= (front + 1) % LSB_SIZE;
             LSBCDB_en <= 1;
             LSBCDB_RoB_index <= RoB_index[front];
-            LSBCDB_value <= Vk[front];
-            busy[front] <= 0;
-            state[front] <= 0;
-            front <= (front + 1) % LSB_SIZE;
-            if (mem_front == front) begin
-              mem_front <= (mem_front + 1) % LSB_SIZE;
-            end
-          end else begin  //STORE
+            case (opcode[front])
+              lb:  LSBCDB_value <= {{24{MCLSB_data[7]}}, MCLSB_data[7:0]};
+              lbu: LSBCDB_value <= {24'b0, MCLSB_data[7:0]};
+              lh:  LSBCDB_value <= {{16{MCLSB_data[15]}}, MCLSB_data[15:0]};
+              lhu: LSBCDB_value <= {16'b0, MCLSB_data[15:0]};
+              lw:  LSBCDB_value <= MCLSB_data;
+            endcase
+          end else begin
             LSBCDB_en <= 0;
-            if (RoBLSB_commit_index + 1 == RoB_index[front]) begin  //commit, write to memory
-              LSBMC_en <= 1;
-              LSBMC_wr <= WRITE;
-              case (opcode[front])
-                sb: begin
-                  LSBMC_data <= Vk[front][7:0];
-                  LSBMC_data_width <= 1;
-                end
-                sh: begin
-                  LSBMC_data <= Vk[front][15:0];
-                  LSBMC_data_width <= 2;
-                end
-                default: begin
-                  LSBMC_data <= Vk[front];
-                  LSBMC_data_width <= 4;
-                end
-              endcase
-              LSBMC_addr   <= address[front];
-              state[front] <= WAITING_MEM;
-            end
-          end
-        end else begin  
-          LSBCDB_en <= 0;
-          if (state[front] == WAITING_MEM && front_type == STORE) begin
-            if (MCLSB_en) begin //commit : write to mem finished
-              LSBMC_en <= 0;
-              busy[front] <= 0;
-              state[front] <= 0;
-              LSBRoB_commit_index <= RoB_index[front];
-              front <= (front + 1) % LSB_SIZE;
-              if (mem_front == front) begin
-                mem_front <= (mem_front + 1) % LSB_SIZE;
-              end
-            end
-          end
-        end
-      end
-      if (busy[mem_front] && ready[mem_front]) begin
-        if (mem_front_type == LOAD) begin  //store instruction is processed in front
-          if (state[mem_front] == UNSTART) begin
-            LSBMC_en <= 1;
-            LSBMC_wr <= READ;
-            LSBMC_data_width <= (opcode[mem_front] == lb || opcode[mem_front] == lbu) ? 1 : (opcode[mem_front] == lh || opcode[mem_front] == lhu) ? 2 : 4;
-            LSBMC_addr <= address[mem_front];
-            state[mem_front] <= WAITING_MEM;
-          end else if (state[mem_front] == WAITING_MEM) begin
-            if (MCLSB_en) begin
-              case (MCLSB_data_number)
-                2'b00:   Vk[mem_front][7:0] <= MCLSB_data;
-                2'b01:   Vk[mem_front][15:8] <= MCLSB_data;
-                2'b10:   Vk[mem_front][23:16] <= MCLSB_data;
-                default: Vk[mem_front][31:24] <= MCLSB_data;
-              endcase
-              if(((opcode[mem_front] == lb || opcode[mem_front] == lbu) && MCLSB_data_number == 2'b00) || ((opcode[mem_front] == lh || opcode[mem_front] == lhu) && MCLSB_data_number == 2'b01) || (opcode[mem_front] == lw && MCLSB_data_number == 2'b11))begin //load finished
-                state[mem_front] <= WAITING_COMMIT;
-                mem_front <= (mem_front + 1) % LSB_SIZE;
-                LSBMC_en <= 0;
-                if (opcode[mem_front] == sb) begin  //sign extend
-                  Vk[mem_front][31:8] <= {24{Vk[mem_front][7]}};
-                end
-                if (opcode[mem_front] == sh) begin  //sign extend
-                  Vk[mem_front][31:16] <= {16{Vk[mem_front][15]}};
-                end
-              end
-            end
-          end
-        end else begin  //mem_front_type == STORE
-          if (state[mem_front] != WAITING_COMMIT) begin
-            state[mem_front] <= WAITING_COMMIT;
           end
         end
       end
     end
   end
-
-
-
-
 endmodule

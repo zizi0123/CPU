@@ -52,6 +52,12 @@ module ICache (
 
   integer i, j;
 
+  always @(MCIC_en) begin
+    if(ICMC_en && MCIC_en) begin
+      ICMC_en <= 0; //disable ICMC_en immediately
+    end
+  end
+
   always @(posedge Sys_clk) begin
     if (Sys_rst) begin
       //invalid all blocks
@@ -75,7 +81,6 @@ module ICache (
       end
       if (MCIC_en) begin : update
         state <= IDLE;
-        ICMC_en <= 0;
         block_valid[ICMC_index] <= 1;
         block_tag[ICMC_index] <= ICMC_tag;
         // for (j = 0; j < BLOCK_SIZE; j = j + 1) begin
