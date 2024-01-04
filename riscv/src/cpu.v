@@ -1,17 +1,17 @@
 // RISCV32I CPU top module
 // port modification allowed for debugging purposes
 
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Mem/mem_controller.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Mem/ins_cache.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/decoder.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/dispatcher.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/instruction_fetcher.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Issue/predictor.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Execute/reservation_station.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Execute/load_store_buffer.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/WriteResult/reorder_buffer.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/WriteResult/CDB.v"
-`include "/mnt/d/大二/RISCV-CPU/riscv/src/Commit/register_file.v"
+// `include "./Mem/mem_controller.v"
+// `include "./Mem/ins_cache.v"
+// `include "./Issue/decoder.v"
+// `include "./Issue/dispatcher.v"
+// `include "./Issue/instruction_fetcher.v"
+// `include "./Issue/predictor.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/Execute/reservation_station.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/Execute/load_store_buffer.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/WriteResult/reorder_buffer.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/WriteResult/CDB.v"
+// `include "/mnt/d/大二/RISCV-CPU/riscv/src/Commit/register_file.v"
 
 module cpu (
     input wire clk_in,  // system clock signal
