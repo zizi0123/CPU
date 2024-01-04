@@ -39,10 +39,11 @@ module InstructionFetcher (
 
   wire [31:0] imm;
   reg [ADDR_WIDTH - 1:0] pc;
+  reg stop_fetch;
   reg [1:0] IF_state;
   reg [31:0] data;
 
-  assign IFIC_en = DCIF_ask_IF;
+  assign IFIC_en = DCIF_ask_IF && !stop_fetch;
   assign IFIC_addr = pc;
   assign IFDC_opcode = ICIF_data[6:0];
   assign IFDC_remain_inst = ICIF_data[31:7];
@@ -51,7 +52,7 @@ module InstructionFetcher (
       :(IFDC_opcode == 7'b1100011) ? {{20{ICIF_data[31]}},ICIF_data[7],ICIF_data[30:25],ICIF_data[11:8],1'b0}  //branch
       : 32'b0;
   assign IFPD_pc = pc;
-  assign IFPD_predict_en = (IFDC_opcode == 7'b1100011);
+  assign IFPD_predict_en = (IFDC_opcode == 7'b1100011 && ICIF_en);
   assign IFPD_branch_result = RoBIF_branch_result;
   assign IFPD_feedback_pc = RoBIF_branch_pc;
 
@@ -63,18 +64,19 @@ module InstructionFetcher (
       IFDC_en <= 0;
       IFPD_feedback_en <= 0;
       data <= 32'hFFFFFFFF;
+      stop_fetch <= 0;
     end else if (Sys_rdy) begin
       if (!RoBIF_pre_judge) begin  //wrong prediction
         pc <= RoBIF_next_pc;
         IF_state <= NORMAL;
         IFDC_en <= 0;
         IFPD_feedback_en <= 1;
+        stop_fetch <= 0;
       end else begin
         if (RoBIF_branch_en) begin  //feedback of correct prediction
           IFPD_feedback_en <= 1;
         end
-        if (IF_state == NORMAL && ICIF_en && data != ICIF_data) begin  //get a new instruction
-          data <= ICIF_data;
+        if (IF_state == NORMAL && ICIF_en && DCIF_ask_IF) begin  //get a new instruction
           if (IFDC_opcode == 7'b1101111) begin : jal
             pc <= pc + imm;
             IFDC_pc <= pc;
@@ -84,9 +86,10 @@ module InstructionFetcher (
             IFDC_pc <= pc;
             IFDC_en <= 1;
           end else if (IFDC_opcode == 7'b1100111) begin : jalr
-            IF_state   <= WAITING_RoB;
-            IFDC_pc <= pc;
-            IFDC_en <= 1;
+            IF_state <= WAITING_RoB;
+            stop_fetch <= 1;
+            IFDC_pc  <= pc;
+            IFDC_en  <= 1;
           end else begin : other
             pc <= pc + 4;
             IFDC_pc <= pc;
@@ -96,6 +99,7 @@ module InstructionFetcher (
           IFDC_en <= 0;
           if (IF_state == WAITING_RoB && RoBIF_jalr_en) begin  //result of jalr from RoB
             IF_state <= NORMAL;
+            stop_fetch <= 0;
             pc <= RoBIF_next_pc;
           end
         end

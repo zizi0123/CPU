@@ -219,7 +219,7 @@ module LoadStoreBuffer (
               LSBMC_addr <= address[front];
               LSB_state[front] <= WAITING_MEM;
             end else begin  //STORE
-              if (RoBLSB_commit_index + 1 == RoB_index[front]) begin  //commit, write to memory
+              if (RoBLSB_commit_index + 1 == RoB_index[front] || (RoBLSB_commit_index == 0 && RoB_index[front] == 0)) begin  //wrong prediction and all cleared, store instruction may be the first insturction
                 LSBMC_en <= 1;
                 LSBMC_wr <= WRITE;
                 case (opcode[front])
@@ -243,6 +243,9 @@ module LoadStoreBuffer (
           end
         end else if (LSB_state[front] == WAITING_MEM) begin
           if (MCLSB_w_en) begin
+`ifdef DEBUG
+            $display("store value: %h to address: %h", Vk[front],address[front]);
+`endif
             busy[front] <= 0;
             LSB_state[front] <= UNSTART;
             LSBRoB_commit_index <= RoB_index[front];

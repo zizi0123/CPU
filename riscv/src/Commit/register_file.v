@@ -42,6 +42,16 @@ module RegisterFile (
   assign RFDP_Vk = (DPRF_rs2 == NON_REG) ? 0 : ((RoBRF_en && dependency[DPRF_rs2] == RoBRF_RoB_index) ? RoBRF_value : ((dependency[DPRF_rs2] == NON_DEP) ? registers[DPRF_rs2] : 0));
 
   integer i;
+  
+`ifdef DEBUG
+  integer idx;
+  initial begin
+    $dumpfile("test.vcd");
+    for (idx = 0; idx < REG_SIZE; idx++) begin
+      $dumpvars(0, registers[idx], dependency[idx]);
+    end
+  end
+`endif
 
   //update regsiter value and register dependency at posedge
   always @(posedge Sys_clk) begin
@@ -56,13 +66,13 @@ module RegisterFile (
           dependency[i] <= NON_DEP;  //clear dependency
         end
       end else begin
-        if (RoBRF_en && RoBRF_rd != NON_REG) begin  //commit to register file
+        if (RoBRF_en && RoBRF_rd != NON_REG && RoBRF_rd != 5'b00000) begin  //commit to register file. write to zero is ignored
           registers[RoBRF_rd] <= RoBRF_value;  //update register value
           if ((dependency[RoBRF_rd] == RoBRF_RoB_index) && (!DPRF_en || DPRF_rd != RoBRF_rd)) begin
             dependency[RoBRF_rd] <= NON_DEP;  //clear dependency
           end
         end
-        if (DPRF_en && (DPRF_rd != NON_REG)) begin  //update dependency
+        if (DPRF_en && (DPRF_rd != NON_REG) && (DPRF_rd != 5'b00000)) begin  //update dependency
           dependency[DPRF_rd] <= DPRF_RoB_index;
         end
       end

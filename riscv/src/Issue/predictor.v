@@ -30,13 +30,25 @@ module Predictor (
   assign BHR_prediction = BHRs[hash_num_prediction];
   assign hash_num_feedback = IFPD_feedback_pc[HASH_WIDTH-1+2:2];
   assign BHR_feedback = BHRs[hash_num_feedback];
+  
+  integer i,j;
+  initial begin
+    for (i = 0; i < HASH_SIZE; i = i + 1) begin
+      BHRs[i] = 0;
+      for (j = 0; j < HISTORY_SIZE; j = j + 1) begin
+        pattern_history_table[i][j] = 2'b01;
+      end
+    end
+  end
 
   always @(*) begin
     //attention not considering reset signal     
     if (IFPD_predict_en) begin  //ask for prediction
       PDIF_predict_result <= pattern_history_table[hash_num_prediction][BHR_prediction][1];
     end else if (IFPD_feedback_en) begin  //feedback the result of branch instruction
-      BHRs[hash_num_feedback] <= {BHRs[hash_num_feedback][HISTORY_LENGTH-1:1], IFPD_branch_result};  //update BHR
+      BHRs[hash_num_feedback] <= {
+        BHRs[hash_num_feedback][HISTORY_LENGTH-1:1], IFPD_branch_result
+      };  //update BHR
       if (IFPD_branch_result == 1) begin
         if (pattern_history_table[hash_num_feedback][BHR_feedback] != 2'b11) begin
           pattern_history_table[hash_num_feedback][BHR_feedback] <= pattern_history_table[hash_num_feedback][BHR_feedback] + 1;

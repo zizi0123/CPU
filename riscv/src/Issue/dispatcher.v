@@ -134,8 +134,13 @@ module Dispatcher (
 
   reg [EX_RoB_WIDTH - 1:0] Qj, Qk;
   reg [31:0] Vj, Vk;
-  reg state;  //IDLE, WAITING_INS
+  reg  state;  //IDLE, WAITING_INS
+  reg  waiting_for_lsb;
+  reg  waiting_for_rs;
+  reg  waiting_for_rob;
+  wire isLS;  //is load or store
 
+  assign isLS = (DCDP_opcode == lb || DCDP_opcode == lh || DCDP_opcode == lw || DCDP_opcode == lbu || DCDP_opcode == lhu || DCDP_opcode == sw || DCDP_opcode == sh || DCDP_opcode == sb);
 
   //check Qj/Qk dependency from :
   //1. RF (and RoB commit at this posedge);
@@ -159,7 +164,8 @@ module Dispatcher (
         end
       end
     end else begin
-      Vj= RFDP_Vj;
+      Qj = NON_DEP;
+      Vj = RFDP_Vj;
     end
     if (RFDP_Qk != NON_DEP) begin
       if(!RoBDP_Qk_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qk) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qk)) begin
@@ -178,7 +184,46 @@ module Dispatcher (
         end
       end
     end else begin
+      Qk = NON_DEP;
       Vk = RFDP_Vk;
+    end
+  end
+
+  always @(*) begin  //DPDC_ask_IF must update immediately
+    if (RSDP_full || LSBDP_full || RoBDP_full || (state == WAITING_INS && DCDP_en)) begin
+      DPDC_ask_IF <= 0;
+    end else begin
+      DPDC_ask_IF <= 1;
+    end
+    if(waiting_for_rob && !RoBDP_full) begin
+      waiting_for_rob <= 0;
+      DPRF_en  <= 1;
+      DPRoB_en <= 1;
+      if (isLS) begin
+        DPLSB_en <= 1;
+      end else begin
+        DPRS_en <= 1;
+      end
+    end
+    if(waiting_for_lsb && !LSBDP_full) begin
+      waiting_for_lsb <= 0;
+      DPRF_en  <= 1;
+      DPRoB_en <= 1;
+      if (isLS) begin
+        DPLSB_en <= 1;
+      end else begin
+        DPRS_en <= 1;
+      end
+    end
+    if(waiting_for_rs && !RSDP_full) begin
+      waiting_for_rs <= 0;
+      DPRF_en  <= 1;
+      DPRoB_en <= 1;
+      if (isLS) begin
+        DPLSB_en <= 1;
+      end else begin
+        DPRS_en <= 1;
+      end
     end
   end
 
@@ -187,7 +232,7 @@ module Dispatcher (
   always @(posedge Sys_clk) begin  //get a new instruction
     if (!RoBDP_pre_judge || Sys_rst) begin : clear
       state <= IDLE;
-      DPDC_ask_IF <= 0;
+      DPDC_ask_IF <= 1;
       DPRF_en <= 0;
       DPRS_en <= 0;
       DPLSB_en <= 0;
@@ -196,32 +241,43 @@ module Dispatcher (
       Qk <= NON_DEP;
       Vj <= 0;
       Vk <= 0;
+      waiting_for_lsb <= 0;
+      waiting_for_rs <= 0;
+      waiting_for_rob <= 0;
     end else if (Sys_rdy) begin
       if (state == IDLE) begin  //ask for a new instruction
         DPRF_en  <= 0;
         DPRoB_en <= 0;
         DPRS_en  <= 0;
         DPLSB_en <= 0;
-        if (RSDP_full || LSBDP_full || RoBDP_full) begin
-          DPDC_ask_IF <= 0;
-        end else begin
-          DPDC_ask_IF <= 1;
+        if (DPDC_ask_IF == 1) begin  //ask for a new instruction
           state <= WAITING_INS;
         end
       end else begin  //waiting for instruction
         if (DCDP_en) begin  //instruction fetched
+          if (RoBDP_full) begin
+            waiting_for_rob <= 1;
+          end else if (isLS && LSBDP_full) begin
+            waiting_for_lsb <= 1;
+          end else if (!isLS && RSDP_full) begin
+            waiting_for_rs <= 1;
+          end else begin
+            DPRF_en  <= 1;
+            DPRoB_en <= 1;
+            if (isLS) begin
+              DPLSB_en <= 1;
+            end else begin
+              DPRS_en <= 1;
+            end
+          end
           state <= IDLE;
-          DPDC_ask_IF <= 0;
-          DPRF_en <= 1;  //sent rd and RoB index to RF
           DPRF_rd <= (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu || DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? NON_REG : DCDP_rd;
           DPRF_RoB_index <= RoBDP_RoB_index;
-          DPRoB_en <= 1;  // pc, opcode, predict_result, rd  to RoB
           DPRoB_pc <= DCDP_pc;
           DPRoB_opcode <= DCDP_opcode;
           DPRoB_predict_result <= DCDP_predict_result;
           DPRoB_rd <= (DCDP_opcode == beq || DCDP_opcode == bne || DCDP_opcode == blt || DCDP_opcode == bge || DCDP_opcode == bltu || DCDP_opcode == bgeu || DCDP_opcode == sb || DCDP_opcode == sh || DCDP_opcode == sw) ? NON_REG : DCDP_rd;
-          if(DCDP_opcode == lb || DCDP_opcode == lh || DCDP_opcode == lw || DCDP_opcode == lbu || DCDP_opcode == lhu || DCDP_opcode == sw || DCDP_opcode == sh || DCDP_opcode == sb) begin
-            DPLSB_en <= 1;  // opcode, imm, Qj, Qk, Vj, Vk to LSB
+          if (isLS) begin
             DPRS_en <= 0;
             DPLSB_RoB_index <= RoBDP_RoB_index;
             DPLSB_Qj <= Qj;
@@ -231,8 +287,6 @@ module Dispatcher (
             DPLSB_opcode <= DCDP_opcode;
             DPLSB_imm <= DCDP_imm;
           end else begin
-            DPLSB_en <= 0;
-            DPRS_en <= 1;  //sent pc, opcode, imm, Qj, Qk, Vj, Vk  to RS
             DPRS_RoB_index <= RoBDP_RoB_index;
             DPRS_pc <= DCDP_pc;
             DPRS_Qj <= Qj;

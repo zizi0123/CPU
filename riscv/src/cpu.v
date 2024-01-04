@@ -34,10 +34,10 @@ module cpu (
   // - Pause cpu(freeze pc, registers, etc.) when rdy_in is low
   // - Memory read result will be returned in the next cycle. Write takes 1 cycle(no need to wait)
   // - Memory is of size 128KB, with valid address ranging from 0x0 to 0x20000
-  // - I/O port is mapped to address higher than 0x30000 (mem_a[17:16]==2'b11)
+  // - I/O port is mapped to add0 (mem_a[17:16]==2'b11)
   // - 0x30000 read: read a byte from input
   // - 0x30000 write: write a byte to output (write 0x00 is ignored)
-  // - 0x30004 read: read clocks passed since cpu starts (in dword, 4 bytes)
+  // - 0x30004 read: read clocks passed since cpu starts (iress higher than 0x3000n dword, 4 bytes)
   // - 0x30004 write: indicates program stop (will output '\0' through uart tx)\
 
   parameter BLOCK_WIDTH = 1;  //a block has 2^1 instructions
@@ -151,6 +151,7 @@ module cpu (
   wire [EX_RoB_WIDTH - 1:0] LSBRoB_commit_index;  //the last committed store instructi
 
   //Reorder Buffer
+  wire RoBIC_pre_judge;
   wire RoBDP_full;
   wire [RoB_WIDTH - 1:0] RoBDP_RoB_index;
   wire RoBDP_pre_judge;  //0:mispredict 1:correct
@@ -244,7 +245,9 @@ module cpu (
       .IFIC_en  (IFIC_en),
       .IFIC_addr(IFIC_addr),
       .ICIF_en  (ICIF_en),
-      .ICIF_data(ICIF_data)
+      .ICIF_data(ICIF_data),
+
+      .RoBIC_pre_judge(RoBIC_pre_judge)
   );
 
   //Instruction Fetcher
@@ -441,6 +444,8 @@ module cpu (
       .Sys_clk(clk_in),
       .Sys_rst(rst_in),
       .Sys_rdy(rdy_in),
+
+      .RoBIC_pre_judge(RoBIC_pre_judge),
 
       .DPRoB_Qj(DPRoB_Qj),
       .DPRoB_Qk(DPRoB_Qk),

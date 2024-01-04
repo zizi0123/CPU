@@ -4,6 +4,9 @@ module ReorderBuffer (
     input Sys_rst,
     input Sys_rdy,
 
+    //ICache
+    output wire RoBIC_pre_judge,
+
     //Dispatcher
     input wire [EX_RoB_WIDTH - 1:0] DPRoB_Qj,  //prefetch:ask if Qj is ready in RoB
     input wire [EX_RoB_WIDTH - 1:0] DPRoB_Qk,  //prefetch:ask if Qk is ready in RoB
@@ -112,7 +115,7 @@ module ReorderBuffer (
   reg [31:0] value[RoB_SIZE - 1:0];  //rd value or branch result(jump or not)
   reg [ADDR_WIDTH - 1:0] next_pc[RoB_SIZE - 1:0];
   reg busy[RoB_SIZE - 1:0];
-  reg state[RoB_SIZE - 1:0];
+  reg state[RoB_SIZE - 1:0];  //ready or unready
   reg [RoB_WIDTH -1 : 0] front;
   reg [RoB_WIDTH -1 : 0] rear;  //rear points to en empty item,the next item to be filled
   reg [RoB_WIDTH -1 : 0] commit_front;  //the last committed instruction in RoB
@@ -121,6 +124,8 @@ module ReorderBuffer (
 
   assign front_type = (busy[front] && (opcode[front] == beq || opcode[front] == bne || opcode[front] == blt || opcode[front] == bge || opcode[front] == bltu || opcode[front] == bgeu)) ? BRANCH : (busy[front] && opcode[front] == jalr) ? JALR : OTHER;
 
+  //ICache
+  assign RoBIC_pre_judge = pre_judge;
   //Dispatcher
   assign RoBDP_full = ((rear + 1) % RoB_SIZE == front);
   assign RoBDP_RoB_index = rear;
@@ -144,6 +149,16 @@ module ReorderBuffer (
   assign RoBRF_pre_judge = pre_judge;
 
   integer i;
+
+`ifdef DEBUG
+  integer idx;
+  initial begin
+    $dumpfile("test.vcd");
+    for (idx = 0; idx < RoB_SIZE; idx++) begin
+      $dumpvars(0, state[idx]);
+    end
+  end
+`endif
 
   always @(posedge Sys_clk) begin
     if (Sys_rst || !pre_judge) begin
@@ -196,6 +211,13 @@ module ReorderBuffer (
 
       //RF
       if (busy[front] && state[front] == READY) begin  //commit an instruction to RF
+`ifdef DEBUG
+        if (front_type == BRANCH) begin
+          $display("%h br %h", pc[front], value[front][0]);
+        end else if (rd[front] != 0) begin
+          $display("%h reg[%d] = %h", pc[front], rd[front], value[front]);
+        end
+`endif
         RoBRF_en <= 1;
         RoBRF_RoB_index <= front;
         RoBRF_rd <= rd[front];

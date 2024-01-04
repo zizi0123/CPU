@@ -45,7 +45,7 @@ module MemController (
   IDLE = 0, READ = 1, WRITE = 2;  //MC_state
 
 
-  reg [1:0] MC_state;
+  reg [1:0] MC_state;  //IDLE,READ,WRITE
   reg [3 + BLOCK_WIDTH - 1:0] remain_byte_num;  //a block has 4*BLOCK_SIZE bytes
   reg last_serve;  //LSB or ICACHE
   wire un_io_access;  // 1 if uart buffer is full and address is 0x30000 or 0x30004.
@@ -77,17 +77,18 @@ module MemController (
           MCRAM_wr <= 0;  //read
         end else if (LSBMC_en && !un_io_access) begin  //serve for LSB
           MC_state <= LSBMC_wr ? WRITE : READ;
-          remain_byte_num <= LSBMC_data_width; //read result will be returned in the next cycle! so the next posedge Ram start to read, and one more posedge Ram finish reading the first byte
           last_serve <= LSB;
           MCRAM_addr <= LSBMC_addr;
           MCRAM_wr <= LSBMC_wr;
           if (LSBMC_wr) begin  //write
+            remain_byte_num <= LSBMC_data_width - 1;
             case (LSBMC_data_width)
-              0: MCRAM_data <= LSBMC_data[7:0];
-              1: MCRAM_data <= LSBMC_data[15:8];
+              1: MCRAM_data <= LSBMC_data[7:0];
+              2: MCRAM_data <= LSBMC_data[15:8];
               4: MCRAM_data <= LSBMC_data[31:24];
-              default: MCRAM_data <= 0;
             endcase
+          end else begin
+            remain_byte_num <= LSBMC_data_width; //read result will be returned in the next cycle! so the next posedge Ram start to read, and one more posedge Ram finish reading the first byte
           end
         end
       end else if (MC_state == READ) begin
@@ -127,8 +128,8 @@ module MemController (
           MCRAM_addr <= MCRAM_addr + 1;
         end else begin  //remain_byte_num == 0,read finished
           MC_state   <= IDLE;
-          MCRAM_wr   <= 1;
-          MCRAM_addr <= 0;  //write 0x00 is ignored
+          MCRAM_wr   <= 0;
+          MCRAM_addr <= 0;
           if (last_serve == ICACHE) begin
             MCIC_en <= 1;
           end else begin
@@ -152,9 +153,9 @@ module MemController (
           endcase
         end else begin  //remain byte num == 0, write finished
           MC_state   <= IDLE;
-          MCRAM_wr   <= 1;
-          MCRAM_addr <= 0;  //write 0x00 is ignored
-          MCLSB_w_en   <= 1;
+          MCRAM_wr   <= 0;
+          MCRAM_addr <= 0;
+          MCLSB_w_en <= 1;
         end
       end
     end
