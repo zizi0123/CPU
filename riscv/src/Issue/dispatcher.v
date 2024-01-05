@@ -147,82 +147,86 @@ module Dispatcher (
   //2. RoB;
   //3, CDB(RS, LSB);
   always @(*) begin
-    if (RFDP_Qj != NON_DEP) begin
-      if(!RoBDP_Qj_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qj) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qj)) begin
-        //Qj is really not ready
-        Qj = RFDP_Qj;
-        Vj = RFDP_Vj;
+    if (!Sys_rst && RoBDP_pre_judge && Sys_rdy) begin
+      if (RFDP_Qj != NON_DEP) begin
+        if(!RoBDP_Qj_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qj) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qj)) begin
+          //Qj is really not ready
+          Qj = RFDP_Qj;
+          Vj = RFDP_Vj;
+        end else begin
+          //get Vj from RoB or CDB
+          Qj = NON_DEP;
+          if (RoBDP_Qj_ready) begin
+            Vj = RoBDP_Vj;
+          end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qj) begin
+            Vj = CDBDP_RS_value;
+          end else begin
+            Vj = CDBDP_LSB_value;
+          end
+        end
       end else begin
-        //get Vj from RoB or CDB
         Qj = NON_DEP;
-        if (RoBDP_Qj_ready) begin
-          Vj = RoBDP_Vj;
-        end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qj) begin
-          Vj = CDBDP_RS_value;
-        end else begin
-          Vj = CDBDP_LSB_value;
-        end
+        Vj = RFDP_Vj;
       end
-    end else begin
-      Qj = NON_DEP;
-      Vj = RFDP_Vj;
-    end
-    if (RFDP_Qk != NON_DEP) begin
-      if(!RoBDP_Qk_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qk) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qk)) begin
-        //Qk is really not ready
-        Qk = RFDP_Qk;
-        Vk = RFDP_Vk;
+      if (RFDP_Qk != NON_DEP) begin
+        if(!RoBDP_Qk_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qk) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qk)) begin
+          //Qk is really not ready
+          Qk = RFDP_Qk;
+          Vk = RFDP_Vk;
+        end else begin
+          //get Vk from RoB or CDB
+          Qk = NON_DEP;
+          if (RoBDP_Qk_ready) begin
+            Vk = RoBDP_Vk;
+          end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qk) begin
+            Vk = CDBDP_RS_value;
+          end else begin
+            Vk = CDBDP_LSB_value;
+          end
+        end
       end else begin
-        //get Vk from RoB or CDB
         Qk = NON_DEP;
-        if (RoBDP_Qk_ready) begin
-          Vk = RoBDP_Vk;
-        end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qk) begin
-          Vk = CDBDP_RS_value;
-        end else begin
-          Vk = CDBDP_LSB_value;
-        end
+        Vk = RFDP_Vk;
       end
-    end else begin
-      Qk = NON_DEP;
-      Vk = RFDP_Vk;
     end
   end
 
   always @(*) begin  //DPDC_ask_IF must update immediately
-    if (RSDP_full || LSBDP_full || RoBDP_full || (state == WAITING_INS && DCDP_en)) begin
-      DPDC_ask_IF <= 0;
-    end else begin
-      DPDC_ask_IF <= 1;
-    end
-    if(waiting_for_rob && !RoBDP_full) begin
-      waiting_for_rob <= 0;
-      DPRF_en  <= 1;
-      DPRoB_en <= 1;
-      if (isLS) begin
-        DPLSB_en <= 1;
+    if (!Sys_rst && RoBDP_pre_judge && Sys_rdy) begin
+      if (RSDP_full || LSBDP_full || RoBDP_full || (state == WAITING_INS && DCDP_en)) begin
+        DPDC_ask_IF <= 0;
       end else begin
-        DPRS_en <= 1;
+        DPDC_ask_IF <= 1;
       end
-    end
-    if(waiting_for_lsb && !LSBDP_full) begin
-      waiting_for_lsb <= 0;
-      DPRF_en  <= 1;
-      DPRoB_en <= 1;
-      if (isLS) begin
-        DPLSB_en <= 1;
-      end else begin
-        DPRS_en <= 1;
+      if (waiting_for_rob && !RoBDP_full) begin
+        waiting_for_rob <= 0;
+        DPRF_en <= 1;
+        DPRoB_en <= 1;
+        if (isLS) begin
+          DPLSB_en <= 1;
+        end else begin
+          DPRS_en <= 1;
+        end
       end
-    end
-    if(waiting_for_rs && !RSDP_full) begin
-      waiting_for_rs <= 0;
-      DPRF_en  <= 1;
-      DPRoB_en <= 1;
-      if (isLS) begin
-        DPLSB_en <= 1;
-      end else begin
-        DPRS_en <= 1;
+      if (waiting_for_lsb && !LSBDP_full) begin
+        waiting_for_lsb <= 0;
+        DPRF_en <= 1;
+        DPRoB_en <= 1;
+        if (isLS) begin
+          DPLSB_en <= 1;
+        end else begin
+          DPRS_en <= 1;
+        end
+      end
+      if (waiting_for_rs && !RSDP_full) begin
+        waiting_for_rs <= 0;
+        DPRF_en <= 1;
+        DPRoB_en <= 1;
+        if (isLS) begin
+          DPLSB_en <= 1;
+        end else begin
+          DPRS_en <= 1;
+        end
       end
     end
   end

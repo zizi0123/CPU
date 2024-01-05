@@ -62,6 +62,8 @@ module ICache (
     end
   end
 
+
+//attention other sensitive signals?
   //if IF asked icache for instruction, then it don't want this instrction any more. discard signal will be restored
   //when icache feedback to IF
   always @(*) begin

@@ -134,7 +134,7 @@ module LoadStoreBuffer (
 
   integer j;
 
-  always @(CDBLSB_RS_en or CDBLSB_RS_RoB_index or LSBCDB_en or LSBCDB_RoB_index) begin
+  always @(*) begin
     if (CDBLSB_RS_en) begin
       for (j = 0; j < LSB_SIZE; ++j) begin
         if (busy[j] && (Qj[j] == CDBLSB_RS_RoB_index)) begin
@@ -162,7 +162,7 @@ module LoadStoreBuffer (
   end
 
   always @(MCLSB_w_en or MCLSB_r_en) begin //update MCLSB_en immediately when memory controller finish a request
-    if (LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
+    if (!(Sys_rst || !RoBLSB_pre_judge) && LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
       LSBMC_en <= 0;
     end
   end
