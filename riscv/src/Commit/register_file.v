@@ -48,7 +48,7 @@ module RegisterFile (
   initial begin
     $dumpfile("test.vcd");
     for (idx = 0; idx < REG_SIZE; idx++) begin
-      $dumpvars(0, registers[idx], dependency[idx]);
+      // $dumpvars(0, registers[idx], dependency[idx]);
     end
   end
 `endif

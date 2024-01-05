@@ -151,12 +151,20 @@ module ReorderBuffer (
   integer i;
 
 `ifdef DEBUG
-  integer idx;
+  parameter FILE_NAME = "./reg_out";
+  integer file_handle = 0;
+  // integer idx;
   initial begin
-    $dumpfile("test.vcd");
-    for (idx = 0; idx < RoB_SIZE; idx++) begin
-      $dumpvars(0, state[idx]);
+    file_handle = $fopen(FILE_NAME, "a");
+    if (!file_handle) begin
+      $display("Could not open File \r");
+      $stop;
     end
+
+    // $dumpfile("test.vcd");
+    // for (idx = 0; idx < RoB_SIZE; idx++) begin
+    //   $dumpvars(0, state[idx]);
+    // end
   end
 `endif
 
@@ -213,8 +221,10 @@ module ReorderBuffer (
       if (busy[front] && state[front] == READY) begin  //commit an instruction to RF
 `ifdef DEBUG
         if (front_type == BRANCH) begin
+          // $fdisplay(file_handle, "%h br %h", pc[front], value[front][0]);
           $display("%h br %h", pc[front], value[front][0]);
         end else if (rd[front] != 0) begin
+          // $fdisplay(file_handle, "%h reg[%d] = %h", pc[front], rd[front], value[front]);
           $display("%h reg[%d] = %h", pc[front], rd[front], value[front]);
         end
 `endif

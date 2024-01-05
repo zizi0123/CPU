@@ -93,6 +93,18 @@ module LoadStoreBuffer (
   parameter orr = 7'd36;
   parameter andd = 7'd37;
 
+// `ifdef DEBUG
+//   parameter FILE_NAME = "./reg_out";
+//   integer file_handle = 0;
+//   initial begin
+//     file_handle = $fopen(FILE_NAME, "a");
+//     if (!file_handle) begin
+//       $display("Could not open File \r");
+//       $stop;
+//     end
+//   end
+// `endif
+
   reg [RoB_WIDTH - 1:0] RoB_index[LSB_SIZE - 1:0];
   reg [6:0] opcode[LSB_SIZE - 1:0];
   reg [31:0] Vj[LSB_SIZE - 1:0];
@@ -244,7 +256,8 @@ module LoadStoreBuffer (
         end else if (LSB_state[front] == WAITING_MEM) begin
           if (MCLSB_w_en) begin
 `ifdef DEBUG
-            $display("store value: %h to address: %h", Vk[front],address[front]);
+            // $fdisplay(file_handle, "store value: %h to address: %h", Vk[front], address[front]);
+            $display("store value: %h to address: %h", Vk[front], address[front]);
 `endif
             busy[front] <= 0;
             LSB_state[front] <= UNSTART;

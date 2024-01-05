@@ -46,7 +46,8 @@ module MemController (
 
 
   reg [1:0] MC_state;  //IDLE,READ,WRITE
-  reg [3 + BLOCK_WIDTH - 1:0] remain_byte_num;  //a block has 4*BLOCK_SIZE bytes
+  reg [3 + BLOCK_WIDTH - 1:0] r_byte_num;  //a block has 4*BLOCK_SIZE bytes
+  reg [2:0] w_byte_num;  //write byte num
   reg last_serve;  //LSB or ICACHE
   wire un_io_access;  // 1 if uart buffer is full and address is 0x30000 or 0x30004.
 
@@ -56,7 +57,8 @@ module MemController (
     if (Sys_rst) begin
       MC_state <= IDLE;
       last_serve <= LSB;
-      remain_byte_num <= 0;
+      r_byte_num <= 0;
+      w_byte_num <= 0;
       MCLSB_r_en <= 0;
       MCLSB_w_en <= 0;
       MCIC_en <= 0;
@@ -70,31 +72,27 @@ module MemController (
         MCLSB_w_en <= 0;
         MCIC_en <= 0;
         if (ICMC_en && (!LSBMC_en || last_serve == LSB) && !un_io_access) begin  //serve for icache
-          MC_state <= READ;
-          remain_byte_num <= 4 * BLOCK_SIZE;
+          MC_state   <= READ;
+          r_byte_num <= 0;
           last_serve <= ICACHE;
           MCRAM_addr <= ICMC_addr;
-          MCRAM_wr <= 0;  //read
+          MCRAM_wr   <= 0;  //read
         end else if (LSBMC_en && !un_io_access) begin  //serve for LSB
-          MC_state <= LSBMC_wr ? WRITE : READ;
+          MC_state   <= LSBMC_wr ? WRITE : READ;
           last_serve <= LSB;
           MCRAM_addr <= LSBMC_addr;
-          MCRAM_wr <= LSBMC_wr;
+          MCRAM_wr   <= LSBMC_wr ? 1 : 0;
           if (LSBMC_wr) begin  //write
-            remain_byte_num <= LSBMC_data_width - 1;
-            case (LSBMC_data_width)
-              1: MCRAM_data <= LSBMC_data[7:0];
-              2: MCRAM_data <= LSBMC_data[15:8];
-              4: MCRAM_data <= LSBMC_data[31:24];
-            endcase
-          end else begin
-            remain_byte_num <= LSBMC_data_width; //read result will be returned in the next cycle! so the next posedge Ram start to read, and one more posedge Ram finish reading the first byte
+            w_byte_num <= 1;
+            MCRAM_data <= LSBMC_data[7:0];
+          end else begin  //read
+            r_byte_num <= 0;  //read result will be returned in the next cycle! so the next posedge Ram start to read, and one more posedge Ram finish reading the first byte
           end
         end
       end else if (MC_state == READ) begin
         // if ((!LSBMC_en && last_serve == LSB) || (!ICMC_en && last_serve == IC)) begin
         //   MC_state   <= IDLE;
-        //   remain_byte_num <= 0;
+        //   r_byte_num <= 0;
         //   if (last_serve == LSB) begin
         //     MCLSB_en <= 0;
         //   end else begin
@@ -102,34 +100,35 @@ module MemController (
         //   end
         //   attention why interruption ?
         // end else begin
+        //attention if BLOCK_WIDTH changed, the following code should be changed
+        // MCIC_block[r_byte_num*8+7 : r_byte_num*8] <= RAMMC_data; 
         if (last_serve == ICACHE) begin
-          //attention if BLOCK_WIDTH changed, the following code should be changed
-          // MCIC_block[remain_byte_num*8+7 : remain_byte_num*8] <= RAMMC_data; 
-          case (remain_byte_num)
-            7: MCIC_block[7:0] <= RAMMC_data;
-            6: MCIC_block[15:8] <= RAMMC_data;
-            5: MCIC_block[23:16] <= RAMMC_data;
+          case (r_byte_num)
+            1: MCIC_block[7:0] <= RAMMC_data;
+            2: MCIC_block[15:8] <= RAMMC_data;
+            3: MCIC_block[23:16] <= RAMMC_data;
             4: MCIC_block[31:24] <= RAMMC_data;
-            3: MCIC_block[39:32] <= RAMMC_data;
-            2: MCIC_block[47:40] <= RAMMC_data;
-            1: MCIC_block[55:48] <= RAMMC_data;
-            0: MCIC_block[63:56] <= RAMMC_data;
+            5: MCIC_block[39:32] <= RAMMC_data;
+            6: MCIC_block[47:40] <= RAMMC_data;
+            7: MCIC_block[55:48] <= RAMMC_data;
+            8: MCIC_block[63:56] <= RAMMC_data;
           endcase
-        end else begin  //last_serve == LSB
-          case (remain_byte_num)
-            3: MCLSB_data[31:24] <= RAMMC_data;
-            2: MCLSB_data[23:16] <= RAMMC_data;
-            1: MCLSB_data[15:8] <= RAMMC_data;
-            0: MCLSB_data[7:0] <= RAMMC_data;
+        end else begin
+          case (r_byte_num)
+            1: MCLSB_data[7:0] <= RAMMC_data;
+            2: MCLSB_data[15:8] <= RAMMC_data;
+            3: MCLSB_data[23:16] <= RAMMC_data;
+            4: MCLSB_data[31:24] <= RAMMC_data;
           endcase
         end
-        if (remain_byte_num > 0) begin
-          remain_byte_num <= remain_byte_num - 1;
+        if((last_serve == ICACHE && r_byte_num < 4 * BLOCK_SIZE) || (last_serve == LSB && r_byte_num < LSBMC_data_width)) begin
+          r_byte_num <= r_byte_num + 1;
           MCRAM_addr <= MCRAM_addr + 1;
-        end else begin  //remain_byte_num == 0,read finished
+        end else begin  //read finished
           MC_state   <= IDLE;
           MCRAM_wr   <= 0;
           MCRAM_addr <= 0;
+          r_byte_num <= 0;
           if (last_serve == ICACHE) begin
             MCIC_en <= 1;
           end else begin
@@ -139,23 +138,24 @@ module MemController (
       end else if (MC_state == WRITE && !io_buffer_full) begin
         // if (!LSBMC_en) begin
         //   MC_state <= IDLE;
-        //   remain_byte_num <= 0;
+        //   w_byte_num <= 0;
         //   MCLSB_en <= 0;
         //explore why interruption ?
         // end else begin
-        if (remain_byte_num > 0) begin
-          remain_byte_num <= remain_byte_num - 1;
+        if (w_byte_num < LSBMC_data_width) begin
+          w_byte_num <= w_byte_num + 1;
           MCRAM_addr <= MCRAM_addr + 1;
-          case (remain_byte_num)
-            3: MCRAM_data <= LSBMC_data[23:16];
-            2: MCRAM_data <= LSBMC_data[15:8];
-            1: MCRAM_data <= LSBMC_data[7:0];
+          case (w_byte_num)
+            1: MCRAM_data <= LSBMC_data[15:8];
+            2: MCRAM_data <= LSBMC_data[23:16];
+            3: MCRAM_data <= LSBMC_data[31:24];
           endcase
         end else begin  //remain byte num == 0, write finished
           MC_state   <= IDLE;
           MCRAM_wr   <= 0;
           MCRAM_addr <= 0;
           MCLSB_w_en <= 1;
+          w_byte_num <= 0;
         end
       end
     end
