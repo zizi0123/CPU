@@ -161,7 +161,7 @@ module LoadStoreBuffer (
     end
   end
 
-  always @(MCLSB_w_en or MCLSB_r_en) begin //update MCLSB_en immediately when memory controller finish a request
+  always @(*) begin //update MCLSB_en immediately when memory controller finish a request
     if (!(Sys_rst || !RoBLSB_pre_judge) && LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
       LSBMC_en <= 0;
     end
@@ -231,7 +231,7 @@ module LoadStoreBuffer (
               LSBMC_addr <= address[front];
               LSB_state[front] <= WAITING_MEM;
             end else begin  //STORE
-              if (RoBLSB_commit_index + 1 == RoB_index[front] || (RoBLSB_commit_index == 0 && RoB_index[front] == 0)) begin  //wrong prediction and all cleared, store instruction may be the first insturction
+              if ((RoBLSB_commit_index + 1) % RoB_SIZE == RoB_index[front] || (RoBLSB_commit_index == 0 && RoB_index[front] == 0)) begin  //wrong prediction and all cleared, store instruction may be the first insturction
                 LSBMC_en <= 1;
                 LSBMC_wr <= WRITE;
                 case (opcode[front])
