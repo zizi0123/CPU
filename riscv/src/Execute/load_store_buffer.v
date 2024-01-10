@@ -93,17 +93,17 @@ module LoadStoreBuffer (
   parameter orr = 7'd36;
   parameter andd = 7'd37;
 
-// `ifdef DEBUG
-//   parameter FILE_NAME = "./reg_out";
-//   integer file_handle = 0;
-//   initial begin
-//     file_handle = $fopen(FILE_NAME, "a");
-//     if (!file_handle) begin
-//       $display("Could not open File \r");
-//       $stop;
-//     end
-//   end
-// `endif
+`ifdef DEBUG
+  parameter FILE_NAME = "./reg.txt";
+  integer file_handle = 0;
+  initial begin
+    file_handle = $fopen(FILE_NAME, "a");
+    if (!file_handle) begin
+      $display("Could not open File \r");
+      $stop;
+    end
+  end
+`endif
 
   reg [RoB_WIDTH - 1:0] RoB_index[LSB_SIZE - 1:0];
   reg [6:0] opcode[LSB_SIZE - 1:0];
@@ -119,6 +119,7 @@ module LoadStoreBuffer (
   reg LSB_state[LSB_SIZE - 1:0];  //LSB_state of a item in LSB. UNSTART:0,WAITING_MEM:1
   reg [LSB_WIDTH - 1:0] front;
   reg [LSB_WIDTH - 1:0] rear;
+  reg discard;  //if prediction is wrong, discard the next data come from memory controller
 
   //update ready signal immediately
   genvar i;
@@ -161,8 +162,8 @@ module LoadStoreBuffer (
     end
   end
 
-  always @(*) begin //update MCLSB_en immediately when memory controller finish a request
-    if (!(Sys_rst || !RoBLSB_pre_judge) && LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
+  always @(*) begin  //update MCLSB_en immediately when memory controller finish a request
+    if (!(Sys_rst || !RoBLSB_pre_judge) && LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en && !discard) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
       LSBMC_en <= 0;
     end
   end
@@ -178,6 +179,11 @@ module LoadStoreBuffer (
       LSBMC_en <= 0;
       LSBCDB_en <= 0;
       LSBRoB_commit_index <= RoB_SIZE;
+      if (!RoBLSB_pre_judge && LSBMC_en && LSBMC_wr == READ && !MCLSB_r_en) begin
+        discard <= 1; //the next data come fron memory controller should be discarded
+      end else begin  //reset
+        discard <= 0;
+      end
     end else if (Sys_rdy) begin
       // sent a new instruction to load store buffer at posedge
       if (DPLSB_en && !LSBDP_full) begin
@@ -217,6 +223,10 @@ module LoadStoreBuffer (
         imm[rear] <= DPLSB_imm;
         LSB_state[rear] <= UNSTART;
         rear <= (rear + 1) % LSB_SIZE;
+      end
+
+      if(discard && MCLSB_r_en) begin
+        discard <= 0;
       end
 
       // sent to CDB or write to memory
@@ -264,7 +274,7 @@ module LoadStoreBuffer (
             LSBRoB_commit_index <= RoB_index[front];
             front <= (front + 1) % LSB_SIZE;
             LSBCDB_en <= 0;
-          end else if (MCLSB_r_en) begin  //load finished
+          end else if (MCLSB_r_en && !discard) begin  //load finished
             busy[front] <= 0;
             LSB_state[front] <= UNSTART;
             front <= (front + 1) % LSB_SIZE;
