@@ -58,6 +58,13 @@ module cpu (
   IDLE = 0, READ = 1, WRITE = 2;  //working_state
 
 
+//for sim
+  reg io_buffer_sim;
+  initial begin
+    io_buffer_sim <= 0;
+  end
+
+
   //MemCtrller
   wire MCIC_en;
   wire [32 * BLOCK_SIZE - 1:0] MCIC_block;
@@ -211,7 +218,7 @@ module cpu (
       .Sys_rdy(rdy_in),
 
       .RAMMC_data(mem_din),
-      .io_buffer_full(io_buffer_full),
+      .io_buffer_full(io_buffer_sim),
       .MCRAM_data(mem_dout),
       .MCRAM_addr(mem_a),
       .MCRAM_wr(mem_wr),
