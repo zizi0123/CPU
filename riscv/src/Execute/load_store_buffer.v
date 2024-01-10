@@ -180,7 +180,7 @@ module LoadStoreBuffer (
       LSBCDB_en <= 0;
       LSBRoB_commit_index <= RoB_SIZE;
       if (!RoBLSB_pre_judge && LSBMC_en && LSBMC_wr == READ && !MCLSB_r_en) begin
-        discard <= 1; //the next data come fron memory controller should be discarded
+        discard <= 1;  //the next data come fron memory controller should be discarded
       end else begin  //reset
         discard <= 0;
       end
@@ -225,73 +225,79 @@ module LoadStoreBuffer (
         rear <= (rear + 1) % LSB_SIZE;
       end
 
-      if(discard && MCLSB_r_en) begin
+      //restore discard signal
+      if (discard && MCLSB_r_en) begin
         discard <= 0;
       end
 
-      // sent to CDB or write to memory
-      if (busy[front]) begin
-        if (LSB_state[front] == UNSTART) begin
-          LSBCDB_en <= 0;
-          if (ready[front]) begin
-            if (front_type == LOAD) begin
-              LSBMC_en <= 1;
-              LSBMC_wr <= READ;
-              LSBMC_data_width <= (opcode[front] == lb || opcode[front] == lbu) ? 1 : (opcode[front] == lh || opcode[front] == lhu) ? 2 : 4;
-              LSBMC_addr <= address[front];
-              LSB_state[front] <= WAITING_MEM;
-            end else begin  //STORE
-              if ((RoBLSB_commit_index + 1) % RoB_SIZE == RoB_index[front] || (RoBLSB_commit_index == 0 && RoB_index[front] == 0)) begin  //wrong prediction and all cleared, store instruction may be the first insturction
+      //when the new commit index has received by RoB, update it to empty to prevent conflicts with RoB index in RS
+      if (LSBRoB_commit_index != RoB_SIZE && !(busy[front] && LSB_state[front] == WAITING_MEM && MCLSB_w_en)) begin
+        LSBRoB_commit_index <= RoB_SIZE;
+      end
+
+        // sent to CDB or write to memory
+        if (busy[front]) begin
+          if (LSB_state[front] == UNSTART) begin
+            LSBCDB_en <= 0;
+            if (ready[front]) begin
+              if (front_type == LOAD) begin
                 LSBMC_en <= 1;
-                LSBMC_wr <= WRITE;
-                case (opcode[front])
-                  sb: begin
-                    LSBMC_data <= Vk[front][7:0];
-                    LSBMC_data_width <= 1;
-                  end
-                  sh: begin
-                    LSBMC_data <= Vk[front][15:0];
-                    LSBMC_data_width <= 2;
-                  end
-                  default: begin
-                    LSBMC_data <= Vk[front];
-                    LSBMC_data_width <= 4;
-                  end
-                endcase
+                LSBMC_wr <= READ;
+                LSBMC_data_width <= (opcode[front] == lb || opcode[front] == lbu) ? 1 : (opcode[front] == lh || opcode[front] == lhu) ? 2 : 4;
                 LSBMC_addr <= address[front];
                 LSB_state[front] <= WAITING_MEM;
+              end else begin  //STORE
+                if ((RoBLSB_commit_index + 1) % RoB_SIZE == RoB_index[front] || (RoBLSB_commit_index == 0 && RoB_index[front] == 0)) begin  //wrong prediction and all cleared, store instruction may be the first insturction
+                  LSBMC_en <= 1;
+                  LSBMC_wr <= WRITE;
+                  case (opcode[front])
+                    sb: begin
+                      LSBMC_data <= Vk[front][7:0];
+                      LSBMC_data_width <= 1;
+                    end
+                    sh: begin
+                      LSBMC_data <= Vk[front][15:0];
+                      LSBMC_data_width <= 2;
+                    end
+                    default: begin
+                      LSBMC_data <= Vk[front];
+                      LSBMC_data_width <= 4;
+                    end
+                  endcase
+                  LSBMC_addr <= address[front];
+                  LSB_state[front] <= WAITING_MEM;
+                end
               end
             end
-          end
-        end else if (LSB_state[front] == WAITING_MEM) begin
-          if (MCLSB_w_en) begin
+          end else if (LSB_state[front] == WAITING_MEM) begin
+            if (MCLSB_w_en) begin
 `ifdef DEBUG
-            // $fdisplay(file_handle, "store value: %h to address: %h", Vk[front], address[front]);
-            $display("store value: %h to address: %h", Vk[front], address[front]);
+              // $fdisplay(file_handle, "store value: %h to address: %h", Vk[front], address[front]);
+              $display("store value: %h to address: %h", Vk[front], address[front]);
 `endif
-            busy[front] <= 0;
-            LSB_state[front] <= UNSTART;
-            LSBRoB_commit_index <= RoB_index[front];
-            front <= (front + 1) % LSB_SIZE;
-            LSBCDB_en <= 0;
-          end else if (MCLSB_r_en && !discard) begin  //load finished
-            busy[front] <= 0;
-            LSB_state[front] <= UNSTART;
-            front <= (front + 1) % LSB_SIZE;
-            LSBCDB_en <= 1;
-            LSBCDB_RoB_index <= RoB_index[front];
-            case (opcode[front])
-              lb:  LSBCDB_value <= {{24{MCLSB_data[7]}}, MCLSB_data[7:0]};
-              lbu: LSBCDB_value <= {24'b0, MCLSB_data[7:0]};
-              lh:  LSBCDB_value <= {{16{MCLSB_data[15]}}, MCLSB_data[15:0]};
-              lhu: LSBCDB_value <= {16'b0, MCLSB_data[15:0]};
-              lw:  LSBCDB_value <= MCLSB_data;
-            endcase
-          end else begin
-            LSBCDB_en <= 0;
+              busy[front] <= 0;
+              LSB_state[front] <= UNSTART;
+              LSBRoB_commit_index <= RoB_index[front];
+              front <= (front + 1) % LSB_SIZE;
+              LSBCDB_en <= 0;
+            end else if (MCLSB_r_en && !discard) begin  //load finished
+              busy[front] <= 0;
+              LSB_state[front] <= UNSTART;
+              front <= (front + 1) % LSB_SIZE;
+              LSBCDB_en <= 1;
+              LSBCDB_RoB_index <= RoB_index[front];
+              case (opcode[front])
+                lb:  LSBCDB_value <= {{24{MCLSB_data[7]}}, MCLSB_data[7:0]};
+                lbu: LSBCDB_value <= {24'b0, MCLSB_data[7:0]};
+                lh:  LSBCDB_value <= {{16{MCLSB_data[15]}}, MCLSB_data[15:0]};
+                lhu: LSBCDB_value <= {16'b0, MCLSB_data[15:0]};
+                lw:  LSBCDB_value <= MCLSB_data;
+              endcase
+            end else begin
+              LSBCDB_en <= 0;
+            end
           end
         end
-      end
     end
   end
 endmodule
