@@ -1,4 +1,13 @@
-module RegisterFile (
+module RegisterFile #(
+    parameter REG_WIDTH = 5,
+    parameter EX_REG_WIDTH = 6,
+    parameter NON_REG = 6'b100000,
+    parameter REG_SIZE = 1 << REG_WIDTH,
+    parameter RoB_WIDTH = 8,
+    parameter EX_RoB_WIDTH = 9,
+    parameter RoB_SIZE = 1 << RoB_WIDTH,
+    parameter NON_DEP = 9'b100000000  //no dependency
+) (
     //sys
     input wire Sys_clk,
     input wire Sys_rst,
@@ -23,15 +32,6 @@ module RegisterFile (
     input wire [31:0] RoBRF_value
 );
 
-  parameter REG_WIDTH = 5;
-  parameter EX_REG_WIDTH = 6;
-  parameter NON_REG = 6'b100000;
-  parameter REG_SIZE = 1 << REG_WIDTH;
-  parameter RoB_WIDTH = 8;
-  parameter EX_RoB_WIDTH = 9;
-  parameter RoB_SIZE = 1 << RoB_WIDTH;
-  parameter NON_DEP = 9'b100000000;  //no dependency
-
   reg [31:0] registers[REG_SIZE - 1:0];
   reg [EX_RoB_WIDTH - 1:0] dependency[REG_SIZE - 1:0];
 
@@ -41,17 +41,19 @@ module RegisterFile (
   assign RFDP_Vj = (DPRF_rs1 == NON_REG) ? 0 : ((RoBRF_en && dependency[DPRF_rs1] == RoBRF_RoB_index) ? RoBRF_value : ((dependency[DPRF_rs1] == NON_DEP) ? registers[DPRF_rs1] : 0));
   assign RFDP_Vk = (DPRF_rs2 == NON_REG) ? 0 : ((RoBRF_en && dependency[DPRF_rs2] == RoBRF_RoB_index) ? RoBRF_value : ((dependency[DPRF_rs2] == NON_DEP) ? registers[DPRF_rs2] : 0));
 
-  integer i;
-  
+
+
 `ifdef DEBUG
   integer idx;
   initial begin
     $dumpfile("test.vcd");
     for (idx = 0; idx < REG_SIZE; idx++) begin
-      // $dumpvars(0, registers[idx], dependency[idx]);
+      $dumpvars(0, registers[idx], dependency[idx]);
     end
   end
 `endif
+
+  integer i;
 
   //update regsiter value and register dependency at posedge
   always @(posedge Sys_clk) begin

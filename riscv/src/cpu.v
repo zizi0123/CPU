@@ -57,14 +57,6 @@ module cpu (
   parameter LSB = 0, ICACHE = 1,  //last_serve
   IDLE = 0, READ = 1, WRITE = 2;  //working_state
 
-
-//for sim
-  reg io_buffer_sim;
-  initial begin
-    io_buffer_sim <= 0;
-  end
-
-
   //MemCtrller
   wire MCIC_en;
   wire [32 * BLOCK_SIZE - 1:0] MCIC_block;
@@ -218,7 +210,7 @@ module cpu (
       .Sys_rdy(rdy_in),
 
       .RAMMC_data(mem_din),
-      .io_buffer_full(io_buffer_sim),
+      .io_buffer_full(io_buffer_full),
       .MCRAM_data(mem_dout),
       .MCRAM_addr(mem_a),
       .MCRAM_wr(mem_wr),
@@ -293,9 +285,9 @@ module cpu (
 
   //Predictor
   Predictor predictor (
-      .Sys_clk(clk_in),
-      .Sys_rst(rst_in),
-      .Sys_rdy(rdy_in),
+    //   .Sys_clk(clk_in),
+    //   .Sys_rst(rst_in),
+    //   .Sys_rdy(rdy_in),
 
       .IFPD_predict_en(IFPD_predict_en),
       .IFPD_pc(IFPD_pc),

@@ -1,4 +1,56 @@
-module ReorderBuffer (
+module ReorderBuffer #(
+    parameter ADDR_WIDTH = 32,
+    parameter REG_WIDTH = 5,
+    parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
+    parameter NON_REG = 6'b100000,
+    parameter RoB_WIDTH = 8,
+    parameter EX_RoB_WIDTH = 9,
+    parameter RoB_SIZE = 1 << RoB_WIDTH,
+    parameter LSB_WIDTH = 3,
+    parameter EX_LSB_WIDTH = 4,
+    parameter LSB_SIZE = 1 << LSB_WIDTH,
+    parameter NON_DEP = 9'b100000000,  //no dependency
+    parameter OTHER = 0,BRANCH = 1,JALR = 2,
+    parameter UNREADY = 0,READY = 1,
+
+    parameter lui = 7'd1,
+    parameter auipc = 7'd2,
+    parameter jal = 7'd3,
+    parameter jalr = 7'd4,
+    parameter beq = 7'd5,
+    parameter bne = 7'd6,
+    parameter blt = 7'd7,
+    parameter bge = 7'd8,
+    parameter bltu = 7'd9,
+    parameter bgeu = 7'd10,
+    parameter lb = 7'd11,
+    parameter lh = 7'd12,
+    parameter lw = 7'd13,
+    parameter lbu = 7'd14,
+    parameter lhu = 7'd15,
+    parameter sb = 7'd16,
+    parameter sh = 7'd17,
+    parameter sw = 7'd18,
+    parameter addi = 7'd19,
+    parameter slti = 7'd20,
+    parameter sltiu = 7'd21,
+    parameter xori = 7'd22,
+    parameter ori = 7'd23,
+    parameter andi = 7'd24,
+    parameter slli = 7'd25,
+    parameter srli = 7'd26,
+    parameter srai = 7'd27,
+    parameter add = 7'd28,
+    parameter sub = 7'd29,
+    parameter sll = 7'd30,
+    parameter slt = 7'd31,
+    parameter sltu = 7'd32,
+    parameter xorr = 7'd33,
+    parameter srl = 7'd34,
+    parameter sra = 7'd35,
+    parameter orr = 7'd36,
+    parameter andd = 7'd37
+) (
     //System
     input Sys_clk,
     input Sys_rst,
@@ -55,57 +107,6 @@ module ReorderBuffer (
     output reg [EX_REG_WIDTH - 1:0] RoBRF_rd,
     output reg [31:0] RoBRF_value
 );
-  parameter ADDR_WIDTH = 32;
-  parameter REG_WIDTH = 5;
-  parameter EX_REG_WIDTH = 6;  //extra one bit for empty reg
-  parameter NON_REG = 6'b100000;
-  parameter RoB_WIDTH = 8;
-  parameter EX_RoB_WIDTH = 9;
-  parameter RoB_SIZE = 1 << RoB_WIDTH;
-  parameter LSB_WIDTH = 3;
-  parameter EX_LSB_WIDTH = 4;
-  parameter LSB_SIZE = 1 << LSB_WIDTH;
-  parameter NON_DEP = 9'b100000000;  //no dependency
-  parameter OTHER = 0, BRANCH = 1, JALR = 2;
-  parameter UNREADY = 0, READY = 1;
-
-  parameter lui = 7'd1;
-  parameter auipc = 7'd2;
-  parameter jal = 7'd3;
-  parameter jalr = 7'd4;
-  parameter beq = 7'd5;
-  parameter bne = 7'd6;
-  parameter blt = 7'd7;
-  parameter bge = 7'd8;
-  parameter bltu = 7'd9;
-  parameter bgeu = 7'd10;
-  parameter lb = 7'd11;
-  parameter lh = 7'd12;
-  parameter lw = 7'd13;
-  parameter lbu = 7'd14;
-  parameter lhu = 7'd15;
-  parameter sb = 7'd16;
-  parameter sh = 7'd17;
-  parameter sw = 7'd18;
-  parameter addi = 7'd19;
-  parameter slti = 7'd20;
-  parameter sltiu = 7'd21;
-  parameter xori = 7'd22;
-  parameter ori = 7'd23;
-  parameter andi = 7'd24;
-  parameter slli = 7'd25;
-  parameter srli = 7'd26;
-  parameter srai = 7'd27;
-  parameter add = 7'd28;
-  parameter sub = 7'd29;
-  parameter sll = 7'd30;
-  parameter slt = 7'd31;
-  parameter sltu = 7'd32;
-  parameter xorr = 7'd33;
-  parameter srl = 7'd34;
-  parameter sra = 7'd35;
-  parameter orr = 7'd36;
-  parameter andd = 7'd37;
 
   reg [RoB_WIDTH - 1:0] RoB_index[RoB_SIZE - 1:0];
   reg [ADDR_WIDTH - 1:0] pc[RoB_SIZE - 1:0];
@@ -148,29 +149,30 @@ module ReorderBuffer (
   //RF
   assign RoBRF_pre_judge = pre_judge;
 
+
+  // `ifdef DEBUG
+  //   parameter FILE_NAME = "./reg.txt";
+  //   integer file_handle = 0;
+  //   integer idx;
+  //   initial begin
+  //     // file_handle = $fopen(FILE_NAME, "a");
+  //     // if (!file_handle) begin
+  //     //   $display("Could not open File \r");
+  //     //   $stop;
+  //     // end
+
+  //     $dumpfile("test.vcd");
+  //     for (idx = 0; idx < RoB_SIZE; idx++) begin
+  //       $dumpvars(0, state[idx]);
+  //     end
+  //   end
+  // `endif
+
   integer i;
-
-`ifdef DEBUG
-  parameter FILE_NAME = "./reg_out";
-  integer file_handle = 0;
-  // integer idx;
-  initial begin
-    file_handle = $fopen(FILE_NAME, "a");
-    if (!file_handle) begin
-      $display("Could not open File \r");
-      $stop;
-    end
-
-    // $dumpfile("test.vcd");
-    // for (idx = 0; idx < RoB_SIZE; idx++) begin
-    //   $dumpvars(0, state[idx]);
-    // end
-  end
-`endif
 
   always @(posedge Sys_clk) begin
     if (Sys_rst || !pre_judge) begin
-      for (i = 0; i < RoB_SIZE; ++i) begin
+      for (i = 0; i < RoB_SIZE; i = i + 1) begin
         RoB_index[i] <= 0;
         pc[i] <= 0;
         opcode[i] <= 0;
@@ -225,7 +227,7 @@ module ReorderBuffer (
           $display("%h br %h", pc[front], value[front][0]);
         end else if (rd[front] != 0) begin
           // $fdisplay(file_handle, "%h reg[%d] = %h", pc[front], rd[front], value[front]);
-          $display("%h reg[%d] = %h", pc[front], rd[front], value[front]);
+          // $display("%h reg[%d] = %h", pc[front], rd[front], value[front]);
         end
 `endif
         RoBRF_en <= 1;

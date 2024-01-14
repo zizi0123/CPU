@@ -1,6 +1,13 @@
 
-//todo io buffer full
-module ICache (
+module ICache #(
+    parameter BLOCK_WIDTH = 1,
+    parameter BLOCK_SIZE = 1 << BLOCK_WIDTH,  //a block has BLOCK_SIZE instructions
+    parameter CACHE_WIDTH = 8,
+    parameter CACHE_SIZE = 1 << CACHE_WIDTH,  //a cache has CACHE_SIZE blocks
+    parameter BLOCK_NUM = 1 << CACHE_WIDTH,
+    parameter ADDR_WIDTH = 32,
+    parameter NORMAL = 0,WAITING = 1  //waiting: waiting for memory controller
+) (
     //sys
     input wire Sys_clk,
     input wire Sys_rst,
@@ -21,14 +28,6 @@ module ICache (
     //Reorder Buffer
     input wire RoBIC_pre_judge
 );
-
-  parameter BLOCK_WIDTH = 1;
-  parameter BLOCK_SIZE = 1 << BLOCK_WIDTH;  //a block has BLOCK_SIZE instructions
-  parameter CACHE_WIDTH = 8;
-  parameter CACHE_SIZE = 1 << CACHE_WIDTH;  //a cache has CACHE_SIZE blocks
-  parameter BLOCK_NUM = 1 << CACHE_WIDTH;
-  parameter ADDR_WIDTH = 32;
-  parameter NORMAL = 0, WAITING = 1;  //waiting: waiting for memory controller
 
   reg state;  //WAITING or NORMAL
   reg discard; //the next instruction get from memory controller should be discarded,because pc has changed since waiting for memory controller (wrong prediction)
@@ -56,14 +55,14 @@ module ICache (
 
   integer i, j;
 
-  always @(MCIC_en) begin
+  always @(*) begin
     if (ICMC_en && MCIC_en) begin
       ICMC_en <= 0;  //disable ICMC_en immediately. 
     end
   end
 
 
-//attention other sensitive signals?
+  //attention other sensitive signals?
   //if IF asked icache for instruction, then it don't want this instrction any more. discard signal will be restored
   //when icache feedback to IF
   always @(*) begin
@@ -112,7 +111,7 @@ module ICache (
           //attention if BLOCK_WIDTH changed, the following code should be changed
           block_data[ICMC_index][0] <= MCIC_block[31:0];
           block_data[ICMC_index][1] <= MCIC_block[63:32];
-          if (!discard) begin //don't need this instruction any more
+          if (!discard) begin  //don't need this instruction any more
             ICIF_en <= 1;
             // ICIF_data   <= MCIC_block[IFIC_block_offset*32+31:IFIC_block_offset*32];
             //attention if BLOCK_WIDTH changed, the following code should be changed

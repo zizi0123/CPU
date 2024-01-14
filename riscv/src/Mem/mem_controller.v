@@ -1,4 +1,21 @@
-module MemController (
+module MemController #(
+    parameter BLOCK_WIDTH = 1,  //a block has 2^1 instructions
+    parameter BLOCK_SIZE = 1 << BLOCK_WIDTH,
+    parameter CACHE_WIDTH = 8,  //a cache has 2^8 blocks
+    parameter BLOCK_NUM = 1 << CACHE_WIDTH,
+    parameter ADDR_WIDTH = 32,
+    parameter REG_WIDTH = 5,
+    parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
+    parameter NON_REG = 6'b100000,
+    parameter RoB_WIDTH = 8,
+    parameter EX_RoB_WIDTH = 9,
+    parameter LSB_WIDTH = 3,
+    parameter EX_LSB_WIDTH = 4,
+    parameter LSB_SIZE = 1 << LSB_WIDTH,
+    parameter NON_DEP = 9'b100000000,  //no dependency
+    parameter LSB = 0,ICACHE = 1,  //last_serve
+    parameter IDLE = 0,READ = 1,WRITE = 2  //MC_state
+) (
     //sys
     input wire Sys_clk,
     input wire Sys_rst,
@@ -27,23 +44,6 @@ module MemController (
     output reg                     MCLSB_w_en,
     output reg  [            31:0] MCLSB_data
 );
-  parameter BLOCK_WIDTH = 1;  //a block has 2^1 instructions
-  parameter BLOCK_SIZE = 1 << BLOCK_WIDTH;
-  parameter CACHE_WIDTH = 8;  //a cache has 2^8 blocks
-  parameter BLOCK_NUM = 1 << CACHE_WIDTH;
-  parameter ADDR_WIDTH = 32;
-  parameter REG_WIDTH = 5;
-  parameter EX_REG_WIDTH = 6;  //extra one bit for empty reg
-  parameter NON_REG = 6'b100000;
-  parameter RoB_WIDTH = 8;
-  parameter EX_RoB_WIDTH = 9;
-  parameter LSB_WIDTH = 3;
-  parameter EX_LSB_WIDTH = 4;
-  parameter LSB_SIZE = 1 << LSB_WIDTH;
-  parameter NON_DEP = 9'b100000000;  //no dependency
-  parameter LSB = 0, ICACHE = 1,  //last_serve
-  IDLE = 0, READ = 1, WRITE = 2;  //MC_state
-
 
   reg [1:0] MC_state;  //IDLE,READ,WRITE
   reg [3 + BLOCK_WIDTH - 1:0] r_byte_num;  //a block has 4*BLOCK_SIZE bytes

@@ -1,8 +1,14 @@
-module Predictor (
+module Predictor #(
+    parameter ADDR_WIDTH = 32,
+    parameter HASH_WIDTH = 4,  //hash bit width
+    parameter HASH_SIZE = 1 << HASH_WIDTH,  //hash size
+    parameter HISTORY_LENGTH = 4,  //history length
+    parameter HISTORY_SIZE = 1 << HISTORY_LENGTH  //history size
+) (
     //sys
-    input wire Sys_clk,
-    input wire Sys_rst,
-    input wire Sys_rdy,
+    // input wire Sys_clk,
+    // input wire Sys_rst,
+    // input wire Sys_rdy,
     //attention not considering reset signal
 
     //instruction fetcher
@@ -13,11 +19,6 @@ module Predictor (
     input wire [ADDR_WIDTH - 1:0] IFPD_feedback_pc,  //the pc of the branch instruction 
     output reg PDIF_predict_result  //0: not taken, 1: taken
 );
-  parameter ADDR_WIDTH = 32;
-  parameter HASH_WIDTH = 4;  //hash bit width
-  parameter HASH_SIZE = 1 << HASH_WIDTH;  //hash size
-  parameter HISTORY_LENGTH = 4;  //history length
-  parameter HISTORY_SIZE = 1 << HISTORY_LENGTH;  //history size
 
   wire [HASH_WIDTH - 1:0] hash_num_prediction;
   wire [HISTORY_LENGTH - 1:0] BHR_prediction;
@@ -30,8 +31,8 @@ module Predictor (
   assign BHR_prediction = BHRs[hash_num_prediction];
   assign hash_num_feedback = IFPD_feedback_pc[HASH_WIDTH-1+2:2];
   assign BHR_feedback = BHRs[hash_num_feedback];
-  
-  integer i,j;
+
+  integer i, j;
   initial begin
     for (i = 0; i < HASH_SIZE; i = i + 1) begin
       BHRs[i] = 0;

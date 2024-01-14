@@ -1,4 +1,51 @@
-module Dispatcher (
+module Dispatcher #(
+    parameter ADDR_WIDTH = 32,
+    parameter REG_WIDTH = 5,
+    parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
+    parameter NON_REG = 6'b100000,
+    parameter RoB_WIDTH = 8,
+    parameter EX_RoB_WIDTH = 9,
+    parameter NON_DEP = 9'b100000000,  //no dependency
+    parameter IDLE = 0, WAITING_INS = 1,
+
+    parameter lui = 7'd1,
+    parameter auipc = 7'd2,
+    parameter jal = 7'd3,
+    parameter jalr = 7'd4,
+    parameter beq = 7'd5,
+    parameter bne = 7'd6,
+    parameter blt = 7'd7,
+    parameter bge = 7'd8,
+    parameter bltu = 7'd9,
+    parameter bgeu = 7'd10,
+    parameter lb = 7'd11,
+    parameter lh = 7'd12,
+    parameter lw = 7'd13,
+    parameter lbu = 7'd14,
+    parameter lhu = 7'd15,
+    parameter sb = 7'd16,
+    parameter sh = 7'd17,
+    parameter sw = 7'd18,
+    parameter addi = 7'd19,
+    parameter slti = 7'd20,
+    parameter sltiu = 7'd21,
+    parameter xori = 7'd22,
+    parameter ori = 7'd23,
+    parameter andi = 7'd24,
+    parameter slli = 7'd25,
+    parameter srli = 7'd26,
+    parameter srai = 7'd27,
+    parameter add = 7'd28,
+    parameter sub = 7'd29,
+    parameter sll = 7'd30,
+    parameter slt = 7'd31,
+    parameter sltu = 7'd32,
+    parameter xorr = 7'd33,
+    parameter srl = 7'd34,
+    parameter sra = 7'd35,
+    parameter orr = 7'd36,
+    parameter andd = 7'd37
+) (
     //sys
     input wire Sys_clk,
     input wire Sys_rst,
@@ -74,53 +121,6 @@ module Dispatcher (
     input wire [31:0] CDBDP_LSB_value
 
 );
-  parameter ADDR_WIDTH = 32;
-  parameter REG_WIDTH = 5;
-  parameter EX_REG_WIDTH = 6;  //extra one bit for empty reg
-  parameter NON_REG = 6'b100000;
-  parameter RoB_WIDTH = 8;
-  parameter EX_RoB_WIDTH = 9;
-  parameter NON_DEP = 9'b100000000;  //no dependency
-  parameter IDLE = 0, WAITING_INS = 1;
-
-
-  parameter lui = 7'd1;
-  parameter auipc = 7'd2;
-  parameter jal = 7'd3;
-  parameter jalr = 7'd4;
-  parameter beq = 7'd5;
-  parameter bne = 7'd6;
-  parameter blt = 7'd7;
-  parameter bge = 7'd8;
-  parameter bltu = 7'd9;
-  parameter bgeu = 7'd10;
-  parameter lb = 7'd11;
-  parameter lh = 7'd12;
-  parameter lw = 7'd13;
-  parameter lbu = 7'd14;
-  parameter lhu = 7'd15;
-  parameter sb = 7'd16;
-  parameter sh = 7'd17;
-  parameter sw = 7'd18;
-  parameter addi = 7'd19;
-  parameter slti = 7'd20;
-  parameter sltiu = 7'd21;
-  parameter xori = 7'd22;
-  parameter ori = 7'd23;
-  parameter andi = 7'd24;
-  parameter slli = 7'd25;
-  parameter srli = 7'd26;
-  parameter srai = 7'd27;
-  parameter add = 7'd28;
-  parameter sub = 7'd29;
-  parameter sll = 7'd30;
-  parameter slt = 7'd31;
-  parameter sltu = 7'd32;
-  parameter xorr = 7'd33;
-  parameter srl = 7'd34;
-  parameter sra = 7'd35;
-  parameter orr = 7'd36;
-  parameter andd = 7'd37;
 
   //RF
   assign DPRF_rs1 = (DCDP_opcode == lui || DCDP_opcode == auipc || DCDP_opcode == jal) ? NON_REG : DCDP_rs1;

@@ -1,4 +1,57 @@
-module LoadStoreBuffer (
+module LoadStoreBuffer #(
+    parameter ADDR_WIDTH = 32,
+    parameter REG_WIDTH = 5,
+    parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
+    parameter NON_REG = 6'b100000,
+    parameter RoB_WIDTH = 8,
+    parameter EX_RoB_WIDTH = 9,
+    parameter RoB_SIZE = 1 << RoB_WIDTH,
+    parameter LSB_WIDTH = 3,
+    parameter EX_LSB_WIDTH = 4,
+    parameter LSB_SIZE = 1 << LSB_WIDTH,
+    parameter NON_DEP = 9'b100000000,  //no dependency
+    parameter UNSTART = 0,WAITING_MEM = 1, //0:unready or ready but haven't interacted with mem 1:waiting for memory controller 
+    parameter LOAD = 1,STORE = 0,
+    parameter READ = 0,WRITE = 1,
+
+    parameter lui = 7'd1,
+    parameter auipc = 7'd2,
+    parameter jal = 7'd3,
+    parameter jalr = 7'd4,
+    parameter beq = 7'd5,
+    parameter bne = 7'd6,
+    parameter blt = 7'd7,
+    parameter bge = 7'd8,
+    parameter bltu = 7'd9,
+    parameter bgeu = 7'd10,
+    parameter lb = 7'd11,
+    parameter lh = 7'd12,
+    parameter lw = 7'd13,
+    parameter lbu = 7'd14,
+    parameter lhu = 7'd15,
+    parameter sb = 7'd16,
+    parameter sh = 7'd17,
+    parameter sw = 7'd18,
+    parameter addi = 7'd19,
+    parameter slti = 7'd20,
+    parameter sltiu = 7'd21,
+    parameter xori = 7'd22,
+    parameter ori = 7'd23,
+    parameter andi = 7'd24,
+    parameter slli = 7'd25,
+    parameter srli = 7'd26,
+    parameter srai = 7'd27,
+    parameter add = 7'd28,
+    parameter sub = 7'd29,
+    parameter sll = 7'd30,
+    parameter slt = 7'd31,
+    parameter sltu = 7'd32,
+    parameter xorr = 7'd33,
+    parameter srl = 7'd34,
+    parameter sra = 7'd35,
+    parameter orr = 7'd36,
+    parameter andd = 7'd37
+) (
     //System
     input Sys_clk,
     input Sys_rst,
@@ -39,71 +92,17 @@ module LoadStoreBuffer (
     output reg [EX_RoB_WIDTH - 1:0] LSBRoB_commit_index  //the last committed store instruction in LSB
 );
 
-
-  parameter ADDR_WIDTH = 32;
-  parameter REG_WIDTH = 5;
-  parameter EX_REG_WIDTH = 6;  //extra one bit for empty reg
-  parameter NON_REG = 6'b100000;
-  parameter RoB_WIDTH = 8;
-  parameter EX_RoB_WIDTH = 9;
-  parameter RoB_SIZE = 1 << RoB_WIDTH;
-  parameter LSB_WIDTH = 3;
-  parameter EX_LSB_WIDTH = 4;
-  parameter LSB_SIZE = 1 << LSB_WIDTH;
-  parameter NON_DEP = 9'b100000000;  //no dependency
-  parameter UNSTART = 0,WAITING_MEM = 1; //0:unready or ready but haven't interacted with mem 1:waiting for memory controller 
-  parameter LOAD = 1, STORE = 0;
-  parameter READ = 0, WRITE = 1;
-
-  parameter lui = 7'd1;
-  parameter auipc = 7'd2;
-  parameter jal = 7'd3;
-  parameter jalr = 7'd4;
-  parameter beq = 7'd5;
-  parameter bne = 7'd6;
-  parameter blt = 7'd7;
-  parameter bge = 7'd8;
-  parameter bltu = 7'd9;
-  parameter bgeu = 7'd10;
-  parameter lb = 7'd11;
-  parameter lh = 7'd12;
-  parameter lw = 7'd13;
-  parameter lbu = 7'd14;
-  parameter lhu = 7'd15;
-  parameter sb = 7'd16;
-  parameter sh = 7'd17;
-  parameter sw = 7'd18;
-  parameter addi = 7'd19;
-  parameter slti = 7'd20;
-  parameter sltiu = 7'd21;
-  parameter xori = 7'd22;
-  parameter ori = 7'd23;
-  parameter andi = 7'd24;
-  parameter slli = 7'd25;
-  parameter srli = 7'd26;
-  parameter srai = 7'd27;
-  parameter add = 7'd28;
-  parameter sub = 7'd29;
-  parameter sll = 7'd30;
-  parameter slt = 7'd31;
-  parameter sltu = 7'd32;
-  parameter xorr = 7'd33;
-  parameter srl = 7'd34;
-  parameter sra = 7'd35;
-  parameter orr = 7'd36;
-  parameter andd = 7'd37;
-
-`ifdef DEBUG
-  parameter FILE_NAME = "./reg.txt";
-  integer file_handle = 0;
-  initial begin
-    file_handle = $fopen(FILE_NAME, "a");
-    if (!file_handle) begin
-      $display("Could not open File \r");
-      $stop;
-    end
-  end
-`endif
+  // `ifdef DEBUG
+  //   parameter FILE_NAME = "./reg.txt";
+  //   integer file_handle = 0;
+  //   initial begin
+  //     file_handle = $fopen(FILE_NAME, "a");
+  //     if (!file_handle) begin
+  //       $display("Could not open File \r");
+  //       $stop;
+  //     end
+  //   end
+  // `endif
 
   reg [RoB_WIDTH - 1:0] RoB_index[LSB_SIZE - 1:0];
   reg [6:0] opcode[LSB_SIZE - 1:0];
@@ -133,11 +132,11 @@ module LoadStoreBuffer (
   assign LSBDP_full = ((rear + 1) % LSB_SIZE == front);
   assign front_type = ((opcode[front] == lb) || (opcode[front] == lh) || (opcode[front] == lw) || (opcode[front] == lbu) || (opcode[front] == lhu)) ? LOAD : STORE;
 
-  integer j;
 
-  always @(*) begin
+  integer j;
+  always @(*) begin : update
     if (CDBLSB_RS_en) begin
-      for (j = 0; j < LSB_SIZE; ++j) begin
+      for (j = 0; j < LSB_SIZE; j = j + 1) begin
         if (busy[j] && (Qj[j] == CDBLSB_RS_RoB_index)) begin
           Qj[j] <= NON_DEP;
           Vj[j] <= CDBLSB_RS_value;
@@ -149,7 +148,7 @@ module LoadStoreBuffer (
       end
     end
     if (LSBCDB_en) begin
-      for (j = 0; j < LSB_SIZE; ++j) begin
+      for (j = 0; j < LSB_SIZE; j = j + 1) begin
         if (busy[j] && (Qj[j] == LSBCDB_RoB_index)) begin
           Qj[j] <= NON_DEP;
           Vj[j] <= LSBCDB_value;
@@ -168,11 +167,13 @@ module LoadStoreBuffer (
     end
   end
 
+  integer k;
+
   always @(posedge Sys_clk) begin
     if (Sys_rst || !RoBLSB_pre_judge) begin
-      for (j = 0; j < LSB_SIZE; ++j) begin
-        busy[j] <= 0;
-        LSB_state[j] <= 0;
+      for (k = 0; k < LSB_SIZE; k = k + 1) begin
+        busy[k] <= 0;
+        LSB_state[k] <= 0;
         front <= 0;
         rear <= 0;
       end
@@ -235,69 +236,69 @@ module LoadStoreBuffer (
         LSBRoB_commit_index <= RoB_SIZE;
       end
 
-        // sent to CDB or write to memory
-        if (busy[front]) begin
-          if (LSB_state[front] == UNSTART) begin
-            LSBCDB_en <= 0;
-            if (ready[front]) begin
-              if (front_type == LOAD) begin
+      // sent to CDB or write to memory
+      if (busy[front]) begin
+        if (LSB_state[front] == UNSTART) begin
+          LSBCDB_en <= 0;
+          if (ready[front]) begin
+            if (front_type == LOAD) begin
+              LSBMC_en <= 1;
+              LSBMC_wr <= READ;
+              LSBMC_data_width <= (opcode[front] == lb || opcode[front] == lbu) ? 1 : (opcode[front] == lh || opcode[front] == lhu) ? 2 : 4;
+              LSBMC_addr <= address[front];
+              LSB_state[front] <= WAITING_MEM;
+            end else begin  //STORE
+              if ((RoBLSB_commit_index + 1) % RoB_SIZE == RoB_index[front] || (RoBLSB_commit_index == 0 && RoB_index[front] == 0)) begin  //wrong prediction and all cleared, store instruction may be the first insturction
                 LSBMC_en <= 1;
-                LSBMC_wr <= READ;
-                LSBMC_data_width <= (opcode[front] == lb || opcode[front] == lbu) ? 1 : (opcode[front] == lh || opcode[front] == lhu) ? 2 : 4;
+                LSBMC_wr <= WRITE;
+                case (opcode[front])
+                  sb: begin
+                    LSBMC_data <= Vk[front][7:0];
+                    LSBMC_data_width <= 1;
+                  end
+                  sh: begin
+                    LSBMC_data <= Vk[front][15:0];
+                    LSBMC_data_width <= 2;
+                  end
+                  default: begin
+                    LSBMC_data <= Vk[front];
+                    LSBMC_data_width <= 4;
+                  end
+                endcase
                 LSBMC_addr <= address[front];
                 LSB_state[front] <= WAITING_MEM;
-              end else begin  //STORE
-                if ((RoBLSB_commit_index + 1) % RoB_SIZE == RoB_index[front] || (RoBLSB_commit_index == 0 && RoB_index[front] == 0)) begin  //wrong prediction and all cleared, store instruction may be the first insturction
-                  LSBMC_en <= 1;
-                  LSBMC_wr <= WRITE;
-                  case (opcode[front])
-                    sb: begin
-                      LSBMC_data <= Vk[front][7:0];
-                      LSBMC_data_width <= 1;
-                    end
-                    sh: begin
-                      LSBMC_data <= Vk[front][15:0];
-                      LSBMC_data_width <= 2;
-                    end
-                    default: begin
-                      LSBMC_data <= Vk[front];
-                      LSBMC_data_width <= 4;
-                    end
-                  endcase
-                  LSBMC_addr <= address[front];
-                  LSB_state[front] <= WAITING_MEM;
-                end
               end
             end
-          end else if (LSB_state[front] == WAITING_MEM) begin
-            if (MCLSB_w_en) begin
+          end
+        end else if (LSB_state[front] == WAITING_MEM) begin
+          if (MCLSB_w_en) begin
 `ifdef DEBUG
-              // $fdisplay(file_handle, "store value: %h to address: %h", Vk[front], address[front]);
-              $display("store value: %h to address: %h", Vk[front], address[front]);
+            // $fdisplay(file_handle, "store value: %h to address: %h", Vk[front], address[front]);
+            $display("store value: %h to address: %h", Vk[front], address[front]);
 `endif
-              busy[front] <= 0;
-              LSB_state[front] <= UNSTART;
-              LSBRoB_commit_index <= RoB_index[front];
-              front <= (front + 1) % LSB_SIZE;
-              LSBCDB_en <= 0;
-            end else if (MCLSB_r_en && !discard) begin  //load finished
-              busy[front] <= 0;
-              LSB_state[front] <= UNSTART;
-              front <= (front + 1) % LSB_SIZE;
-              LSBCDB_en <= 1;
-              LSBCDB_RoB_index <= RoB_index[front];
-              case (opcode[front])
-                lb:  LSBCDB_value <= {{24{MCLSB_data[7]}}, MCLSB_data[7:0]};
-                lbu: LSBCDB_value <= {24'b0, MCLSB_data[7:0]};
-                lh:  LSBCDB_value <= {{16{MCLSB_data[15]}}, MCLSB_data[15:0]};
-                lhu: LSBCDB_value <= {16'b0, MCLSB_data[15:0]};
-                lw:  LSBCDB_value <= MCLSB_data;
-              endcase
-            end else begin
-              LSBCDB_en <= 0;
-            end
+            busy[front] <= 0;
+            LSB_state[front] <= UNSTART;
+            LSBRoB_commit_index <= RoB_index[front];
+            front <= (front + 1) % LSB_SIZE;
+            LSBCDB_en <= 0;
+          end else if (MCLSB_r_en && !discard) begin  //load finished
+            busy[front] <= 0;
+            LSB_state[front] <= UNSTART;
+            front <= (front + 1) % LSB_SIZE;
+            LSBCDB_en <= 1;
+            LSBCDB_RoB_index <= RoB_index[front];
+            case (opcode[front])
+              lb:  LSBCDB_value <= {{24{MCLSB_data[7]}}, MCLSB_data[7:0]};
+              lbu: LSBCDB_value <= {24'b0, MCLSB_data[7:0]};
+              lh:  LSBCDB_value <= {{16{MCLSB_data[15]}}, MCLSB_data[15:0]};
+              lhu: LSBCDB_value <= {16'b0, MCLSB_data[15:0]};
+              lw:  LSBCDB_value <= MCLSB_data;
+            endcase
+          end else begin
+            LSBCDB_en <= 0;
           end
         end
+      end
     end
   end
 endmodule

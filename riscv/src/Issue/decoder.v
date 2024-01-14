@@ -1,4 +1,44 @@
-module Decoder (
+module Decoder #(
+    parameter ADDR_WIDTH = 32,
+    parameter REG_WIDTH = 5,
+    parameter lui = 7'd1,
+    parameter auipc = 7'd2,
+    parameter jal = 7'd3,
+    parameter jalr = 7'd4,
+    parameter beq = 7'd5,
+    parameter bne = 7'd6,
+    parameter blt = 7'd7,
+    parameter bge = 7'd8,
+    parameter bltu = 7'd9,
+    parameter bgeu = 7'd10,
+    parameter lb = 7'd11,
+    parameter lh = 7'd12,
+    parameter lw = 7'd13,
+    parameter lbu = 7'd14,
+    parameter lhu = 7'd15,
+    parameter sb = 7'd16,
+    parameter sh = 7'd17,
+    parameter sw = 7'd18,
+    parameter addi = 7'd19,
+    parameter slti = 7'd20,
+    parameter sltiu = 7'd21,
+    parameter xori = 7'd22,
+    parameter ori = 7'd23,
+    parameter andi = 7'd24,
+    parameter slli = 7'd25,
+    parameter srli = 7'd26,
+    parameter srai = 7'd27,
+    parameter add = 7'd28,
+    parameter sub = 7'd29,
+    parameter sll = 7'd30,
+    parameter slt = 7'd31,
+    parameter sltu = 7'd32,
+    parameter xorr = 7'd33,
+    parameter srl = 7'd34,
+    parameter sra = 7'd35,
+    parameter orr = 7'd36,
+    parameter andd = 7'd37
+) (
     //instruction fetcher
     input wire IFDC_en,
     input wire [ADDR_WIDTH - 1:0] IFDC_pc,
@@ -18,46 +58,6 @@ module Decoder (
     output wire [31:0] DCDP_imm,
     output wire DCDP_predict_result  //0: not taken, 1: taken
 );
-  parameter ADDR_WIDTH = 32;
-  parameter REG_WIDTH = 5;
-  parameter lui = 7'd1;
-  parameter auipc = 7'd2;
-  parameter jal = 7'd3;
-  parameter jalr = 7'd4;
-  parameter beq = 7'd5;
-  parameter bne = 7'd6;
-  parameter blt = 7'd7;
-  parameter bge = 7'd8;
-  parameter bltu = 7'd9;
-  parameter bgeu = 7'd10;
-  parameter lb = 7'd11;
-  parameter lh = 7'd12;
-  parameter lw = 7'd13;
-  parameter lbu = 7'd14;
-  parameter lhu = 7'd15;
-  parameter sb = 7'd16;
-  parameter sh = 7'd17;
-  parameter sw = 7'd18;
-  parameter addi = 7'd19;
-  parameter slti = 7'd20;
-  parameter sltiu = 7'd21;
-  parameter xori = 7'd22;
-  parameter ori = 7'd23;
-  parameter andi = 7'd24;
-  parameter slli = 7'd25;
-  parameter srli = 7'd26;
-  parameter srai = 7'd27;
-  parameter add = 7'd28;
-  parameter sub = 7'd29;
-  parameter sll = 7'd30;
-  parameter slt = 7'd31;
-  parameter sltu = 7'd32;
-  parameter xorr = 7'd33;
-  parameter srl = 7'd34;
-  parameter sra = 7'd35;
-  parameter orr = 7'd36;
-  parameter andd = 7'd37;
-
 
   assign DCDP_en = IFDC_en;
   assign DCDP_pc = IFDC_pc;

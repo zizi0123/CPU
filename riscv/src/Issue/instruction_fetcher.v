@@ -1,4 +1,7 @@
-module InstructionFetcher (
+module InstructionFetcher #(
+    parameter ADDR_WIDTH = 32,
+    parameter NORMAL = 0,WAITING_PREDICT = 1,WAITING_RoB = 2
+) (
     //sys
     input wire Sys_clk,
     input wire Sys_rst,
@@ -34,8 +37,6 @@ module InstructionFetcher (
     input wire [ADDR_WIDTH - 1:0] RoBIF_branch_pc,  //the pc of the branch instruction
     input wire [ADDR_WIDTH - 1:0] RoBIF_next_pc //the pc of the next instruction for jalr/wrong prediction
 );
-  parameter ADDR_WIDTH = 32;
-  parameter NORMAL = 0, WAITING_PREDICT = 1, WAITING_RoB = 2;
 
   wire [31:0] imm;
   reg [ADDR_WIDTH - 1:0] pc;
@@ -88,8 +89,8 @@ module InstructionFetcher (
           end else if (IFDC_opcode == 7'b1100111) begin : jalr
             IF_state <= WAITING_RoB;
             stop_fetch <= 1;
-            IFDC_pc  <= pc;
-            IFDC_en  <= 1;
+            IFDC_pc <= pc;
+            IFDC_en <= 1;
           end else begin : other
             pc <= pc + 4;
             IFDC_pc <= pc;

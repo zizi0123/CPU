@@ -1,4 +1,53 @@
-module ReservationStation (
+module ReservationStation #(
+    parameter ADDR_WIDTH = 32,
+    parameter REG_WIDTH = 5,
+    parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
+    parameter NON_REG = 6'b100000,
+    parameter RoB_WIDTH = 8,
+    parameter EX_RoB_WIDTH = 9,
+    parameter RS_WIDTH = 3,
+    parameter EX_RS_WIDTH = 4,
+    parameter RS_SIZE = 1 << RS_WIDTH,
+    parameter NON_DEP = 9'b100000000,  //no dependency
+
+    parameter lui = 7'd1,
+    parameter auipc = 7'd2,
+    parameter jal = 7'd3,
+    parameter jalr = 7'd4,
+    parameter beq = 7'd5,
+    parameter bne = 7'd6,
+    parameter blt = 7'd7,
+    parameter bge = 7'd8,
+    parameter bltu = 7'd9,
+    parameter bgeu = 7'd10,
+    parameter lb = 7'd11,
+    parameter lh = 7'd12,
+    parameter lw = 7'd13,
+    parameter lbu = 7'd14,
+    parameter lhu = 7'd15,
+    parameter sb = 7'd16,
+    parameter sh = 7'd17,
+    parameter sw = 7'd18,
+    parameter addi = 7'd19,
+    parameter slti = 7'd20,
+    parameter sltiu = 7'd21,
+    parameter xori = 7'd22,
+    parameter ori = 7'd23,
+    parameter andi = 7'd24,
+    parameter slli = 7'd25,
+    parameter srli = 7'd26,
+    parameter srai = 7'd27,
+    parameter add = 7'd28,
+    parameter sub = 7'd29,
+    parameter sll = 7'd30,
+    parameter slt = 7'd31,
+    parameter sltu = 7'd32,
+    parameter xorr = 7'd33,
+    parameter srl = 7'd34,
+    parameter sra = 7'd35,
+    parameter orr = 7'd36,
+    parameter andd = 7'd37
+) (
     //System
     input Sys_clk,
     input Sys_rst,
@@ -30,54 +79,6 @@ module ReservationStation (
 );
 
 
-  parameter ADDR_WIDTH = 32;
-  parameter REG_WIDTH = 5;
-  parameter EX_REG_WIDTH = 6;  //extra one bit for empty reg
-  parameter NON_REG = 6'b100000;
-  parameter RoB_WIDTH = 8;
-  parameter EX_RoB_WIDTH = 9;
-  parameter RS_WIDTH = 3;
-  parameter EX_RS_WIDTH = 4;
-  parameter RS_SIZE = 1 << RS_WIDTH;
-  parameter NON_DEP = 9'b100000000;  //no dependency
-
-  parameter lui = 7'd1;
-  parameter auipc = 7'd2;
-  parameter jal = 7'd3;
-  parameter jalr = 7'd4;
-  parameter beq = 7'd5;
-  parameter bne = 7'd6;
-  parameter blt = 7'd7;
-  parameter bge = 7'd8;
-  parameter bltu = 7'd9;
-  parameter bgeu = 7'd10;
-  parameter lb = 7'd11;
-  parameter lh = 7'd12;
-  parameter lw = 7'd13;
-  parameter lbu = 7'd14;
-  parameter lhu = 7'd15;
-  parameter sb = 7'd16;
-  parameter sh = 7'd17;
-  parameter sw = 7'd18;
-  parameter addi = 7'd19;
-  parameter slti = 7'd20;
-  parameter sltiu = 7'd21;
-  parameter xori = 7'd22;
-  parameter ori = 7'd23;
-  parameter andi = 7'd24;
-  parameter slli = 7'd25;
-  parameter srli = 7'd26;
-  parameter srai = 7'd27;
-  parameter add = 7'd28;
-  parameter sub = 7'd29;
-  parameter sll = 7'd30;
-  parameter slt = 7'd31;
-  parameter sltu = 7'd32;
-  parameter xorr = 7'd33;
-  parameter srl = 7'd34;
-  parameter sra = 7'd35;
-  parameter orr = 7'd36;
-  parameter andd = 7'd37;
 
   reg [RoB_WIDTH - 1:0] RoB_index[RS_SIZE - 1:0];
   reg busy[RS_SIZE - 1:0];
@@ -104,12 +105,11 @@ module ReservationStation (
   assign ready_head = (ready[0]) ? 0 : (ready[1]) ? 1 : (ready[2]) ? 2 : (ready[3]) ? 3 : (ready[4]) ? 4 : (ready[5]) ? 5 : (ready[6]) ? 6 : (ready[7]) ? 7 : 8;
   assign RSDP_full = idle_head == RS_SIZE;
 
-
   integer j;
 
-  always @(CDBRS_LSB_en or CDBRS_LSB_RoB_index or RSCDB_en or RSCDB_RoB_index) begin //update dependency immediately
+  always @(*) begin  //update dependency immediately
     if (CDBRS_LSB_en) begin
-      for (j = 0; j < RS_SIZE; ++j) begin
+      for (j = 0; j < RS_SIZE; j = j + 1) begin
         if (Qj[j] == CDBRS_LSB_RoB_index) begin
           Qj[j] <= NON_DEP;
           Vj[j] <= CDBRS_LSB_value;
@@ -121,7 +121,7 @@ module ReservationStation (
       end
     end
     if (RSCDB_en) begin
-      for (j = 0; j < RS_SIZE; ++j) begin
+      for (j = 0; j < RS_SIZE; j = j + 1) begin
         if (Qj[j] == RSCDB_RoB_index) begin
           Qj[j] <= NON_DEP;
           Vj[j] <= RSCDB_value;
@@ -136,7 +136,7 @@ module ReservationStation (
 
   always @(posedge Sys_clk) begin
     if (Sys_rst || !RoBRS_pre_judge) begin
-      for (j = 0; j < RS_SIZE; ++j) begin
+      for (j = 0; j < RS_SIZE; j = j + 1) begin
         busy[j] <= 0;
       end
       RSCDB_en <= 0;
@@ -207,11 +207,19 @@ module ReservationStation (
           end
           blt: begin
             RSCDB_value <= ($signed(Vj[ready_head]) < $signed(Vk[ready_head])) ? 1 : 0;
-            RSCDB_next_pc <= ($signed(Vj[ready_head]) < $signed( Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+            RSCDB_next_pc <= ($signed(
+                Vj[ready_head]
+            ) < $signed(
+                Vk[ready_head]
+            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bge: begin
             RSCDB_value <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? 1 : 0;
-            RSCDB_next_pc <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+            RSCDB_next_pc <= ($signed(
+                Vj[ready_head]
+            ) >= $signed(
+                Vk[ready_head]
+            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bltu: begin
             RSCDB_value <= (Vj[ready_head] < Vk[ready_head]) ? 1 : 0;
