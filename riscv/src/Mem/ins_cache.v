@@ -6,7 +6,8 @@ module ICache #(
     parameter CACHE_SIZE = 1 << CACHE_WIDTH,  //a cache has CACHE_SIZE blocks
     parameter BLOCK_NUM = 1 << CACHE_WIDTH,
     parameter ADDR_WIDTH = 32,
-    parameter NORMAL = 0,WAITING = 1  //waiting: waiting for memory controller
+    parameter NORMAL = 0,
+    WAITING = 1  //waiting: waiting for memory controller
 ) (
     //sys
     input wire Sys_clk,
@@ -61,17 +62,6 @@ module ICache #(
     end
   end
 
-
-  //attention other sensitive signals?
-  //if IF asked icache for instruction, then it don't want this instrction any more. discard signal will be restored
-  //when icache feedback to IF
-  always @(*) begin
-    if (!RoBIC_pre_judge && IFIC_en) begin
-      discard <= 1;
-    end
-  end
-
-
   always @(posedge Sys_clk) begin
     if (Sys_rst) begin
       //invalid all blocks
@@ -82,18 +72,20 @@ module ICache #(
       ICMC_en <= 0;
       ICIF_en <= 0;
       discard <= 0;
+    end else if (!RoBIC_pre_judge) begin
+      ICMC_en <= 0;
+      ICIF_en <= 0;
+      if (state == WAITING) begin
+        discard <= 1;
+      end
     end else if (Sys_rdy) begin
       if (ICIF_en) begin  //instruction fetcher need one cycle to update.
         ICIF_en <= 0;
       end else begin
         if (IFIC_en && state == NORMAL) begin
           if (block_tag[IFIC_index] == IFIC_tag && block_valid[IFIC_index]) begin  //hit
-            if (!discard) begin
-              ICIF_en   <= 1;
-              ICIF_data <= block_data[IFIC_index][IFIC_block_offset];
-            end else begin
-              discard <= 0;  //restore discard signal
-            end
+            ICIF_en   <= 1;
+            ICIF_data <= block_data[IFIC_index][IFIC_block_offset];
           end else begin  //miss
             state <= WAITING;  //begin waiting for memory controller
             ICIF_en <= 0;

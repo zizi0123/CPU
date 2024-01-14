@@ -227,7 +227,7 @@ module ReorderBuffer #(
           $display("%h br %h", pc[front], value[front][0]);
         end else if (rd[front] != 0) begin
           // $fdisplay(file_handle, "%h reg[%d] = %h", pc[front], rd[front], value[front]);
-          // $display("%h reg[%d] = %h", pc[front], rd[front], value[front]);
+          $display("%h reg[%d] = %h", pc[front], rd[front], value[front]);
         end
 `endif
         RoBRF_en <= 1;
