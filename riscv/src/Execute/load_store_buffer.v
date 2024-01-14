@@ -10,9 +10,12 @@ module LoadStoreBuffer #(
     parameter EX_LSB_WIDTH = 4,
     parameter LSB_SIZE = 1 << LSB_WIDTH,
     parameter NON_DEP = 9'b100000000,  //no dependency
-    parameter UNSTART = 0,WAITING_MEM = 1, //0:unready or ready but haven't interacted with mem 1:waiting for memory controller 
-    parameter LOAD = 1,STORE = 0,
-    parameter READ = 0,WRITE = 1,
+    parameter UNSTART = 0,
+    WAITING_MEM = 1, //0:unready or ready but haven't interacted with mem 1:waiting for memory controller 
+    parameter LOAD = 1,
+    STORE = 0,
+    parameter READ = 0,
+    WRITE = 1,
 
     parameter lui = 7'd1,
     parameter auipc = 7'd2,
@@ -92,18 +95,6 @@ module LoadStoreBuffer #(
     output reg [EX_RoB_WIDTH - 1:0] LSBRoB_commit_index  //the last committed store instruction in LSB
 );
 
-  // `ifdef DEBUG
-  //   parameter FILE_NAME = "./reg.txt";
-  //   integer file_handle = 0;
-  //   initial begin
-  //     file_handle = $fopen(FILE_NAME, "a");
-  //     if (!file_handle) begin
-  //       $display("Could not open File \r");
-  //       $stop;
-  //     end
-  //   end
-  // `endif
-
   reg [RoB_WIDTH - 1:0] RoB_index[LSB_SIZE - 1:0];
   reg [6:0] opcode[LSB_SIZE - 1:0];
   reg [31:0] Vj[LSB_SIZE - 1:0];
@@ -132,42 +123,13 @@ module LoadStoreBuffer #(
   assign LSBDP_full = ((rear + 1) % LSB_SIZE == front);
   assign front_type = ((opcode[front] == lb) || (opcode[front] == lh) || (opcode[front] == lw) || (opcode[front] == lbu) || (opcode[front] == lhu)) ? LOAD : STORE;
 
+  // always @(*) begin  //update MCLSB_en immediately when memory controller finish a request
+  //   if (!(Sys_rst || !RoBLSB_pre_judge) && LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en && !discard) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
+  //     LSBMC_en <= 0;
+  //   end
+  // end
 
-  integer j;
-  always @(*) begin : update
-    if (CDBLSB_RS_en) begin
-      for (j = 0; j < LSB_SIZE; j = j + 1) begin
-        if (busy[j] && (Qj[j] == CDBLSB_RS_RoB_index)) begin
-          Qj[j] <= NON_DEP;
-          Vj[j] <= CDBLSB_RS_value;
-        end
-        if (busy[j] && (Qk[j] == CDBLSB_RS_RoB_index)) begin
-          Qk[j] <= NON_DEP;
-          Vk[j] <= CDBLSB_RS_value;
-        end
-      end
-    end
-    if (LSBCDB_en) begin
-      for (j = 0; j < LSB_SIZE; j = j + 1) begin
-        if (busy[j] && (Qj[j] == LSBCDB_RoB_index)) begin
-          Qj[j] <= NON_DEP;
-          Vj[j] <= LSBCDB_value;
-        end
-        if (busy[j] && (Qk[j] == LSBCDB_RoB_index)) begin
-          Qk[j] <= NON_DEP;
-          Vk[j] <= LSBCDB_value;
-        end
-      end
-    end
-  end
-
-  always @(*) begin  //update MCLSB_en immediately when memory controller finish a request
-    if (!(Sys_rst || !RoBLSB_pre_judge) && LSBMC_en && ((LSBMC_wr == READ && MCLSB_r_en && !discard) || LSBMC_wr == WRITE && MCLSB_w_en)) begin
-      LSBMC_en <= 0;
-    end
-  end
-
-  integer k;
+  integer j, k;
 
   always @(posedge Sys_clk) begin
     if (Sys_rst || !RoBLSB_pre_judge) begin
@@ -226,14 +188,13 @@ module LoadStoreBuffer #(
         rear <= (rear + 1) % LSB_SIZE;
       end
 
-      //restore discard signal
-      if (discard && MCLSB_r_en) begin
-        discard <= 0;
-      end
-
       //when the new commit index has received by RoB, update it to empty to prevent conflicts with RoB index in RS
       if (LSBRoB_commit_index != RoB_SIZE && !(busy[front] && LSB_state[front] == WAITING_MEM && MCLSB_w_en)) begin
         LSBRoB_commit_index <= RoB_SIZE;
+      end
+
+      if(discard && MCLSB_r_en) begin
+        discard <= 0; //restore discard
       end
 
       // sent to CDB or write to memory
@@ -276,26 +237,58 @@ module LoadStoreBuffer #(
             // $fdisplay(file_handle, "store value: %h to address: %h", Vk[front], address[front]);
             $display("store value: %h to address: %h", Vk[front], address[front]);
 `endif
+            LSBMC_en <= 0;
             busy[front] <= 0;
             LSB_state[front] <= UNSTART;
             LSBRoB_commit_index <= RoB_index[front];
             front <= (front + 1) % LSB_SIZE;
             LSBCDB_en <= 0;
-          end else if (MCLSB_r_en && !discard) begin  //load finished
-            busy[front] <= 0;
-            LSB_state[front] <= UNSTART;
-            front <= (front + 1) % LSB_SIZE;
-            LSBCDB_en <= 1;
-            LSBCDB_RoB_index <= RoB_index[front];
-            case (opcode[front])
-              lb:  LSBCDB_value <= {{24{MCLSB_data[7]}}, MCLSB_data[7:0]};
-              lbu: LSBCDB_value <= {24'b0, MCLSB_data[7:0]};
-              lh:  LSBCDB_value <= {{16{MCLSB_data[15]}}, MCLSB_data[15:0]};
-              lhu: LSBCDB_value <= {16'b0, MCLSB_data[15:0]};
-              lw:  LSBCDB_value <= MCLSB_data;
-            endcase
+          end else if (MCLSB_r_en) begin  //load finished
+            if (!discard) begin
+              LSBMC_en <= 0;
+              busy[front] <= 0;
+              LSB_state[front] <= UNSTART;
+              front <= (front + 1) % LSB_SIZE;
+              LSBCDB_en <= 1;
+              LSBCDB_RoB_index <= RoB_index[front];
+              case (opcode[front])
+                lb:  LSBCDB_value <= {{24{MCLSB_data[7]}}, MCLSB_data[7:0]};
+                lbu: LSBCDB_value <= {24'b0, MCLSB_data[7:0]};
+                lh:  LSBCDB_value <= {{16{MCLSB_data[15]}}, MCLSB_data[15:0]};
+                lhu: LSBCDB_value <= {16'b0, MCLSB_data[15:0]};
+                lw:  LSBCDB_value <= MCLSB_data;
+              endcase
+            end else begin
+              LSBCDB_en <= 0;
+            end
           end else begin
             LSBCDB_en <= 0;
+          end
+        end
+      end
+
+      //update dependency and value
+      if (CDBLSB_RS_en) begin
+        for (j = 0; j < LSB_SIZE; j = j + 1) begin
+          if (busy[j] && (Qj[j] == CDBLSB_RS_RoB_index)) begin
+            Qj[j] <= NON_DEP;
+            Vj[j] <= CDBLSB_RS_value;
+          end
+          if (busy[j] && (Qk[j] == CDBLSB_RS_RoB_index)) begin
+            Qk[j] <= NON_DEP;
+            Vk[j] <= CDBLSB_RS_value;
+          end
+        end
+      end
+      if (LSBCDB_en) begin
+        for (j = 0; j < LSB_SIZE; j = j + 1) begin
+          if (busy[j] && (Qj[j] == LSBCDB_RoB_index)) begin
+            Qj[j] <= NON_DEP;
+            Vj[j] <= LSBCDB_value;
+          end
+          if (busy[j] && (Qk[j] == LSBCDB_RoB_index)) begin
+            Qk[j] <= NON_DEP;
+            Vk[j] <= LSBCDB_value;
           end
         end
       end

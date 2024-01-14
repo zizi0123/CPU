@@ -107,33 +107,6 @@ module ReservationStation #(
 
   integer j;
 
-  always @(*) begin  //update dependency immediately
-    if (CDBRS_LSB_en) begin
-      for (j = 0; j < RS_SIZE; j = j + 1) begin
-        if (Qj[j] == CDBRS_LSB_RoB_index) begin
-          Qj[j] <= NON_DEP;
-          Vj[j] <= CDBRS_LSB_value;
-        end
-        if (Qk[j] == CDBRS_LSB_RoB_index) begin
-          Qk[j] <= NON_DEP;
-          Vk[j] <= CDBRS_LSB_value;
-        end
-      end
-    end
-    if (RSCDB_en) begin
-      for (j = 0; j < RS_SIZE; j = j + 1) begin
-        if (Qj[j] == RSCDB_RoB_index) begin
-          Qj[j] <= NON_DEP;
-          Vj[j] <= RSCDB_value;
-        end
-        if (Qk[j] == RSCDB_RoB_index) begin
-          Qk[j] <= NON_DEP;
-          Vk[j] <= RSCDB_value;
-        end
-      end
-    end
-  end
-
   always @(posedge Sys_clk) begin
     if (Sys_rst || !RoBRS_pre_judge) begin
       for (j = 0; j < RS_SIZE; j = j + 1) begin
@@ -178,6 +151,7 @@ module ReservationStation #(
         busy[idle_head] <= 1;
         pc[idle_head] <= DPRS_pc;
       end
+
       if (ready_head != RS_SIZE) begin  //send a ready instruction to CDB at posedge
         RSCDB_en <= 1;
         RSCDB_RoB_index <= RoB_index[ready_head];
@@ -208,18 +182,11 @@ module ReservationStation #(
           blt: begin
             RSCDB_value <= ($signed(Vj[ready_head]) < $signed(Vk[ready_head])) ? 1 : 0;
             RSCDB_next_pc <= ($signed(
-                Vj[ready_head]
-            ) < $signed(
-                Vk[ready_head]
-            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+                Vj[ready_head]) < $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bge: begin
             RSCDB_value <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? 1 : 0;
-            RSCDB_next_pc <= ($signed(
-                Vj[ready_head]
-            ) >= $signed(
-                Vk[ready_head]
-            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+            RSCDB_next_pc <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bltu: begin
             RSCDB_value <= (Vj[ready_head] < Vk[ready_head]) ? 1 : 0;
@@ -289,6 +256,31 @@ module ReservationStation #(
         endcase
       end else begin
         RSCDB_en <= 0;
+      end
+
+      if (CDBRS_LSB_en) begin //update dependency at posedge
+        for (j = 0; j < RS_SIZE; j = j + 1) begin
+          if (Qj[j] == CDBRS_LSB_RoB_index) begin
+            Qj[j] <= NON_DEP;
+            Vj[j] <= CDBRS_LSB_value;
+          end
+          if (Qk[j] == CDBRS_LSB_RoB_index) begin
+            Qk[j] <= NON_DEP;
+            Vk[j] <= CDBRS_LSB_value;
+          end
+        end
+      end
+      if (RSCDB_en) begin
+        for (j = 0; j < RS_SIZE; j = j + 1) begin
+         if (Qj[j] == RSCDB_RoB_index) begin
+           Qj[j] <= NON_DEP;
+           Vj[j] <= RSCDB_value;
+          end
+          if (Qk[j] == RSCDB_RoB_index) begin
+           Qk[j] <= NON_DEP;
+           Vk[j] <= RSCDB_value;
+          end
+        end
       end
     end
   end

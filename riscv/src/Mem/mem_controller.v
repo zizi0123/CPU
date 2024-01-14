@@ -13,8 +13,8 @@ module MemController #(
     parameter EX_LSB_WIDTH = 4,
     parameter LSB_SIZE = 1 << LSB_WIDTH,
     parameter NON_DEP = 9'b100000000,  //no dependency
-    parameter LSB = 0,ICACHE = 1,  //last_serve
-    parameter IDLE = 0,READ = 1,WRITE = 2  //MC_state
+    parameter LSB = 0, ICACHE = 1,  //last_serve
+    parameter IDLE = 0, READ = 1, WRITE = 2  //MC_state
 ) (
     //sys
     input wire Sys_clk,
@@ -71,13 +71,13 @@ module MemController #(
         MCLSB_r_en <= 0;
         MCLSB_w_en <= 0;
         MCIC_en <= 0;
-        if (ICMC_en && (!LSBMC_en || last_serve == LSB) && !un_io_access) begin  //serve for icache
+        if (ICMC_en && !MCIC_en && (!LSBMC_en || last_serve == LSB) && !un_io_access) begin  //serve for icache
           MC_state   <= READ;
           r_byte_num <= 0;
           last_serve <= ICACHE;
           MCRAM_addr <= ICMC_addr;
           MCRAM_wr   <= 0;  //read
-        end else if (LSBMC_en && !un_io_access) begin  //serve for LSB
+        end else if (LSBMC_en &&((LSBMC_wr && !MCLSB_w_en)||(!LSBMC_wr && !MCLSB_r_en)) && !un_io_access) begin  //serve for LSB
           MC_state   <= LSBMC_wr ? WRITE : READ;
           last_serve <= LSB;
           MCRAM_addr <= LSBMC_addr;

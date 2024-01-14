@@ -56,12 +56,6 @@ module ICache #(
 
   integer i, j;
 
-  always @(*) begin
-    if (ICMC_en && MCIC_en) begin
-      ICMC_en <= 0;  //disable ICMC_en immediately. 
-    end
-  end
-
   always @(posedge Sys_clk) begin
     if (Sys_rst) begin
       //invalid all blocks
@@ -77,6 +71,7 @@ module ICache #(
       ICIF_en <= 0;
       if (state == WAITING) begin
         discard <= 1;
+        state   <= NORMAL;
       end
     end else if (Sys_rdy) begin
       if (ICIF_en) begin  //instruction fetcher need one cycle to update.
@@ -94,16 +89,17 @@ module ICache #(
           end
         end
         if (MCIC_en) begin : update
-          state <= NORMAL;
-          block_valid[ICMC_index] <= 1;
-          block_tag[ICMC_index] <= ICMC_tag;
-          // for (j = 0; j < BLOCK_SIZE; j = j + 1) begin
-          //   block_data[ICMC_index][j] <= MCIC_block[j*32+31:j*32];   
-          // end
-          //attention if BLOCK_WIDTH changed, the following code should be changed
-          block_data[ICMC_index][0] <= MCIC_block[31:0];
-          block_data[ICMC_index][1] <= MCIC_block[63:32];
+          ICMC_en <= 0;
+          state   <= NORMAL;
           if (!discard) begin  //don't need this instruction any more
+            block_valid[ICMC_index] <= 1; //if discard, index and tag might have changed,can't write to cache
+            block_tag[ICMC_index] <= ICMC_tag;
+            // for (j = 0; j < BLOCK_SIZE; j = j + 1) begin
+            //   block_data[ICMC_index][j] <= MCIC_block[j*32+31:j*32];   
+            // end
+            //attention if BLOCK_WIDTH changed, the following code should be changed
+            block_data[ICMC_index][0] <= MCIC_block[31:0];
+            block_data[ICMC_index][1] <= MCIC_block[63:32];
             ICIF_en <= 1;
             // ICIF_data   <= MCIC_block[IFIC_block_offset*32+31:IFIC_block_offset*32];
             //attention if BLOCK_WIDTH changed, the following code should be changed
