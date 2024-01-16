@@ -153,23 +153,16 @@ module ReorderBuffer #(
   assign RoBRF_pre_judge = pre_judge;
 
 
-  // `ifdef DEBUG
-  //   parameter FILE_NAME = "./reg.txt";
-  //   integer file_handle = 0;
-  //   integer idx;
-  //   initial begin
-  //     // file_handle = $fopen(FILE_NAME, "a");
-  //     // if (!file_handle) begin
-  //     //   $display("Could not open File \r");
-  //     //   $stop;
-  //     // end
 
-  //     $dumpfile("test.vcd");
-  //     for (idx = 0; idx < RoB_SIZE; idx++) begin
-  //       $dumpvars(0, state[idx]);
-  //     end
-  //   end
-  // `endif
+`ifdef DEBUG
+  integer idx;
+  initial begin
+    $dumpfile("test.vcd");
+    for (idx = 0; idx < RoB_SIZE; idx = idx + 1) begin
+      $dumpvars(0, state[idx]);
+    end
+  end
+`endif
 
   integer i;
 

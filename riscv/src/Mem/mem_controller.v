@@ -6,7 +6,7 @@ module MemController #(
     parameter ADDR_WIDTH = 32,
     parameter REG_WIDTH = 5,
     parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
-    parameter NON_REG = 1 << REG_WIDTH,
+    parameter NON_REG = 6'b100000,
     parameter RoB_WIDTH = 4,
     parameter EX_RoB_WIDTH = 5,
     parameter LSB_WIDTH = 3,

@@ -1,4 +1,7 @@
 riscv/testspace/*
+riscv/testcase/*
+riscv/sim/testbench.v
+
 
 *.o
 *.vcd

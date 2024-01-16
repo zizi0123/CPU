@@ -6,7 +6,7 @@
 module testbench;
 
 
-// `define DEBUG
+`define DEBUG
 
 reg clk;
 reg rst;
@@ -33,7 +33,7 @@ end
 initial begin
      $dumpfile("test.vcd");
      $dumpvars(0, testbench);
-     #300000 $finish;
+     #30000000 $finish;
 end
 `endif
 

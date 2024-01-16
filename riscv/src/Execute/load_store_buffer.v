@@ -265,6 +265,8 @@ module LoadStoreBuffer #(
             LSBCDB_en <= 0;
           end
         end
+      end else begin
+        LSBCDB_en <= 0;
       end
 
       //update dependency and value
