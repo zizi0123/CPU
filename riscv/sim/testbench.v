@@ -6,7 +6,7 @@
 module testbench;
 
 
-`define DEBUG
+// `define DEBUG
 
 reg clk;
 reg rst;
