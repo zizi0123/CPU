@@ -147,53 +147,51 @@ module Dispatcher #(
   //2. RoB;
   //3, CDB(RS, LSB);
   always @(*) begin
-    if (Sys_rst || !RoBDP_pre_judge) begin
+    if (Sys_rst || !RoBDP_pre_judge || !Sys_rdy) begin
       Qj = NON_DEP;
       Qk = NON_DEP;
       Vj = 0;
       Vk = 0;
     end else begin
-      if (Sys_rdy) begin
-        if (RFDP_Qj != NON_DEP) begin
-          if(!RoBDP_Qj_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qj) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qj)) begin
-            //Qj is really not ready
-            Qj = RFDP_Qj;
-            Vj = RFDP_Vj;
-          end else begin
-            //get Vj from RoB or CDB
-            Qj = NON_DEP;
-            if (RoBDP_Qj_ready) begin
-              Vj = RoBDP_Vj;
-            end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qj) begin
-              Vj = CDBDP_RS_value;
-            end else begin
-              Vj = CDBDP_LSB_value;
-            end
-          end
-        end else begin
-          Qj = NON_DEP;
+      if (RFDP_Qj != NON_DEP) begin
+        if(!RoBDP_Qj_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qj) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qj)) begin
+          //Qj is really not ready
+          Qj = RFDP_Qj;
           Vj = RFDP_Vj;
-        end
-        if (RFDP_Qk != NON_DEP) begin
-          if(!RoBDP_Qk_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qk) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qk)) begin
-            //Qk is really not ready
-            Qk = RFDP_Qk;
-            Vk = RFDP_Vk;
-          end else begin
-            //get Vk from RoB or CDB
-            Qk = NON_DEP;
-            if (RoBDP_Qk_ready) begin
-              Vk = RoBDP_Vk;
-            end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qk) begin
-              Vk = CDBDP_RS_value;
-            end else begin
-              Vk = CDBDP_LSB_value;
-            end
-          end
         end else begin
-          Qk = NON_DEP;
-          Vk = RFDP_Vk;
+          //get Vj from RoB or CDB
+          Qj = NON_DEP;
+          if (RoBDP_Qj_ready) begin
+            Vj = RoBDP_Vj;
+          end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qj) begin
+            Vj = CDBDP_RS_value;
+          end else begin
+            Vj = CDBDP_LSB_value;
+          end
         end
+      end else begin
+        Qj = NON_DEP;
+        Vj = RFDP_Vj;
+      end
+      if (RFDP_Qk != NON_DEP) begin
+        if(!RoBDP_Qk_ready && (!CDBDP_RS_en || CDBDP_RS_RoB_index != RFDP_Qk) && (!CDBDP_LSB_en || CDBDP_LSB_RoB_index != RFDP_Qk)) begin
+          //Qk is really not ready
+          Qk = RFDP_Qk;
+          Vk = RFDP_Vk;
+        end else begin
+          //get Vk from RoB or CDB
+          Qk = NON_DEP;
+          if (RoBDP_Qk_ready) begin
+            Vk = RoBDP_Vk;
+          end else if (CDBDP_RS_en && CDBDP_RS_RoB_index == RFDP_Qk) begin
+            Vk = CDBDP_RS_value;
+          end else begin
+            Vk = CDBDP_LSB_value;
+          end
+        end
+      end else begin
+        Qk = NON_DEP;
+        Vk = RFDP_Vk;
       end
     end
   end
@@ -201,9 +199,9 @@ module Dispatcher #(
 
   //update DPDC_ask_IF immediately
   always @(*) begin
-    if (!RoBDP_pre_judge || Sys_rst) begin
+    if (!RoBDP_pre_judge || Sys_rst || !Sys_rdy) begin
       DPDC_ask_IF = 1;
-    end else if (Sys_rdy) begin
+    end else begin
       if (RSDP_full || LSBDP_full || RoBDP_full || (state == WAITING_INS && DCDP_en)) begin
         DPDC_ask_IF = 0;
       end else begin

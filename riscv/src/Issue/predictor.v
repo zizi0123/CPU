@@ -6,10 +6,9 @@ module Predictor #(
     parameter HISTORY_SIZE = 1 << HISTORY_LENGTH  //history size
 ) (
     //sys
-    // input wire Sys_clk,
-    // input wire Sys_rst,
-    // input wire Sys_rdy,
-    //attention not considering reset signal
+    input wire Sys_clk,
+    input wire Sys_rst,
+    input wire Sys_rdy,
 
     //instruction fetcher
     input wire IFPD_predict_en,  //ask for prediction
@@ -32,33 +31,40 @@ module Predictor #(
   assign hash_num_feedback = IFPD_feedback_pc[HASH_WIDTH-1+2:2];
   assign BHR_feedback = BHRs[hash_num_feedback];
 
-  integer i, j;
-  initial begin
-    for (i = 0; i < HASH_SIZE; i = i + 1) begin
-      BHRs[i] = 0;
-      for (j = 0; j < HISTORY_SIZE; j = j + 1) begin
-        pattern_history_table[i][j] = 2'b01;
-      end
+  always@(*) begin
+    if (IFPD_predict_en) begin  //ask for prediction
+      PDIF_predict_result = pattern_history_table[hash_num_prediction][BHR_prediction][1];
+    end else begin
+      PDIF_predict_result = 1'b0;
     end
   end
 
-  always @(*) begin
-    //attention not considering reset signal     
-    if (IFPD_predict_en) begin  //ask for prediction
-      PDIF_predict_result = pattern_history_table[hash_num_prediction][BHR_prediction][1];
-    end else if (IFPD_feedback_en) begin  //feedback the result of branch instruction
-      BHRs[hash_num_feedback] = {BHRs[hash_num_feedback][HISTORY_LENGTH-1:1], IFPD_branch_result};  //update BHR
-      if (IFPD_branch_result == 1) begin
-        if (pattern_history_table[hash_num_feedback][BHR_feedback] != 2'b11) begin
-          pattern_history_table[hash_num_feedback][BHR_feedback] = pattern_history_table[hash_num_feedback][BHR_feedback] + 1;
+  integer i, j;
+
+  always @(posedge Sys_clk) begin
+    if (Sys_rst) begin
+      for (i = 0; i < HASH_SIZE; i = i + 1) begin
+        BHRs[i] = 0;
+        for (j = 0; j < HISTORY_SIZE; j = j + 1) begin
+          pattern_history_table[i][j] = 2'b01;
         end
-      end else begin
-        if (pattern_history_table[hash_num_feedback][BHR_feedback] != 2'b00) begin
-          pattern_history_table[hash_num_feedback][BHR_feedback] = pattern_history_table[hash_num_feedback][BHR_feedback] - 1;
+      end
+    end else if(Sys_rdy) begin
+      //attention not considering reset signal     
+        if (IFPD_feedback_en) begin  //feedback the result of branch instruction
+          BHRs[hash_num_feedback] <= {BHRs[hash_num_feedback][HISTORY_LENGTH-1:1], IFPD_branch_result};  //update BHR
+          if (IFPD_branch_result == 1) begin
+            if (pattern_history_table[hash_num_feedback][BHR_feedback] != 2'b11) begin
+              pattern_history_table[hash_num_feedback][BHR_feedback] <= pattern_history_table[hash_num_feedback][BHR_feedback] + 1;
+            end
+          end else begin
+            if (pattern_history_table[hash_num_feedback][BHR_feedback] != 2'b00) begin
+              pattern_history_table[hash_num_feedback][BHR_feedback] <= pattern_history_table[hash_num_feedback][BHR_feedback] - 1;
+            end
+          end
         end
       end
     end
-  end
 
 
 endmodule

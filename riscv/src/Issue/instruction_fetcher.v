@@ -17,9 +17,9 @@ module InstructionFetcher #(
     input wire DCIF_ask_IF,  //ask for a new instruction
     output reg IFDC_en,
     output reg [ADDR_WIDTH - 1:0] IFDC_pc,
+    output reg IFDC_predict_result,  //0: not taken, 1: taken
     output wire [6:0] IFDC_opcode,
     output wire [31:7] IFDC_remain_inst,
-    output wire IFDC_predict_result,  //0: not taken, 1: taken
 
     //predictor
     input wire PDIF_predict_result,  //0: not taken, 1: taken. immediate result of prediction
@@ -48,7 +48,6 @@ module InstructionFetcher #(
   assign IFIC_addr = pc;
   assign IFDC_opcode = ICIF_data[6:0];
   assign IFDC_remain_inst = ICIF_data[31:7];
-  assign IFDC_predict_result = PDIF_predict_result;
   assign imm = (IFDC_opcode == 7'b1101111) ? {{12{ICIF_data[31]}},ICIF_data[19:12],ICIF_data[20],ICIF_data[30:21],1'b0}  //jal
       :(IFDC_opcode == 7'b1100011) ? {{20{ICIF_data[31]}},ICIF_data[7],ICIF_data[30:25],ICIF_data[11:8],1'b0}  //branch
       : 32'b0;
@@ -86,6 +85,7 @@ module InstructionFetcher #(
             pc <= PDIF_predict_result ? pc + imm : pc + 4;
             IFDC_pc <= pc;
             IFDC_en <= 1;
+            IFDC_predict_result <= PDIF_predict_result;
           end else if (IFDC_opcode == 7'b1100111) begin : jalr
             IF_state <= WAITING_RoB;
             stop_fetch <= 1;
