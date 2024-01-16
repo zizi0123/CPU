@@ -285,9 +285,9 @@ module cpu (
 
   //Predictor
   Predictor predictor (
-      //   .Sys_clk(clk_in),
-      //   .Sys_rst(rst_in),
-      //   .Sys_rdy(rdy_in),
+      .Sys_clk(clk_in),
+      .Sys_rst(rst_in),
+      .Sys_rdy(rdy_in),
 
       .IFPD_predict_en(IFPD_predict_en),
       .IFPD_pc(IFPD_pc),
