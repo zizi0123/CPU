@@ -1,12 +1,12 @@
 module RegisterFile #(
     parameter REG_WIDTH = 5,
     parameter EX_REG_WIDTH = 6,
-    parameter NON_REG = 6'b100000,
+    parameter NON_REG = 1 << REG_WIDTH,
     parameter REG_SIZE = 1 << REG_WIDTH,
-    parameter RoB_WIDTH = 8,
-    parameter EX_RoB_WIDTH = 9,
+    parameter RoB_WIDTH = 4,
+    parameter EX_RoB_WIDTH = 5,
     parameter RoB_SIZE = 1 << RoB_WIDTH,
-    parameter NON_DEP = 9'b100000000  //no dependency
+    parameter NON_DEP = 1 << RoB_WIDTH  //no dependency
 ) (
     //sys
     input wire Sys_clk,

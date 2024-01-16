@@ -2,16 +2,19 @@ module ReorderBuffer #(
     parameter ADDR_WIDTH = 32,
     parameter REG_WIDTH = 5,
     parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
-    parameter NON_REG = 6'b100000,
-    parameter RoB_WIDTH = 8,
-    parameter EX_RoB_WIDTH = 9,
+    parameter NON_REG = 1 << REG_WIDTH,
+    parameter RoB_WIDTH = 4,
+    parameter EX_RoB_WIDTH = 5,
     parameter RoB_SIZE = 1 << RoB_WIDTH,
     parameter LSB_WIDTH = 3,
     parameter EX_LSB_WIDTH = 4,
     parameter LSB_SIZE = 1 << LSB_WIDTH,
-    parameter NON_DEP = 9'b100000000,  //no dependency
-    parameter OTHER = 0,BRANCH = 1,JALR = 2,
-    parameter UNREADY = 0,READY = 1,
+    parameter NON_DEP = 1 << RoB_WIDTH,  //no dependency
+    parameter OTHER = 0,
+    BRANCH = 1,
+    JALR = 2,
+    parameter UNREADY = 0,
+    READY = 1,
 
     parameter lui = 7'd1,
     parameter auipc = 7'd2,

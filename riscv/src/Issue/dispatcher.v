@@ -2,10 +2,10 @@ module Dispatcher #(
     parameter ADDR_WIDTH = 32,
     parameter REG_WIDTH = 5,
     parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
-    parameter NON_REG = 6'b100000,
-    parameter RoB_WIDTH = 8,
-    parameter EX_RoB_WIDTH = 9,
-    parameter NON_DEP = 9'b100000000,  //no dependency
+    parameter NON_REG = 1 << REG_WIDTH,
+    parameter RoB_WIDTH = 4,
+    parameter EX_RoB_WIDTH = 5,
+    parameter NON_DEP = 1 << RoB_WIDTH,  //no dependency
     parameter IDLE = 0,
     WAITING_INS = 1,
 

@@ -2,13 +2,13 @@ module ReservationStation #(
     parameter ADDR_WIDTH = 32,
     parameter REG_WIDTH = 5,
     parameter EX_REG_WIDTH = 6,  //extra one bit for empty reg
-    parameter NON_REG = 6'b100000,
-    parameter RoB_WIDTH = 8,
-    parameter EX_RoB_WIDTH = 9,
+    parameter NON_REG = 1 << REG_WIDTH,
+    parameter RoB_WIDTH = 4,
+    parameter EX_RoB_WIDTH = 5,
     parameter RS_WIDTH = 3,
     parameter EX_RS_WIDTH = 4,
     parameter RS_SIZE = 1 << RS_WIDTH,
-    parameter NON_DEP = 9'b100000000,  //no dependency
+    parameter NON_DEP = 1 << RoB_WIDTH,  //no dependency
 
     parameter lui = 7'd1,
     parameter auipc = 7'd2,
@@ -182,11 +182,18 @@ module ReservationStation #(
           blt: begin
             RSCDB_value <= ($signed(Vj[ready_head]) < $signed(Vk[ready_head])) ? 1 : 0;
             RSCDB_next_pc <= ($signed(
-                Vj[ready_head]) < $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+                Vj[ready_head]
+            ) < $signed(
+                Vk[ready_head]
+            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bge: begin
             RSCDB_value <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? 1 : 0;
-            RSCDB_next_pc <= ($signed(Vj[ready_head]) >= $signed(Vk[ready_head])) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
+            RSCDB_next_pc <= ($signed(
+                Vj[ready_head]
+            ) >= $signed(
+                Vk[ready_head]
+            )) ? pc[ready_head] + imm[ready_head] : pc[ready_head] + 4;
           end
           bltu: begin
             RSCDB_value <= (Vj[ready_head] < Vk[ready_head]) ? 1 : 0;
@@ -258,7 +265,7 @@ module ReservationStation #(
         RSCDB_en <= 0;
       end
 
-      if (CDBRS_LSB_en) begin //update dependency at posedge
+      if (CDBRS_LSB_en) begin  //update dependency at posedge
         for (j = 0; j < RS_SIZE; j = j + 1) begin
           if (Qj[j] == CDBRS_LSB_RoB_index) begin
             Qj[j] <= NON_DEP;
@@ -272,13 +279,13 @@ module ReservationStation #(
       end
       if (RSCDB_en) begin
         for (j = 0; j < RS_SIZE; j = j + 1) begin
-         if (Qj[j] == RSCDB_RoB_index) begin
-           Qj[j] <= NON_DEP;
-           Vj[j] <= RSCDB_value;
+          if (Qj[j] == RSCDB_RoB_index) begin
+            Qj[j] <= NON_DEP;
+            Vj[j] <= RSCDB_value;
           end
           if (Qk[j] == RSCDB_RoB_index) begin
-           Qk[j] <= NON_DEP;
-           Vk[j] <= RSCDB_value;
+            Qk[j] <= NON_DEP;
+            Vk[j] <= RSCDB_value;
           end
         end
       end
