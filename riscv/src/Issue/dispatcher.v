@@ -200,12 +200,12 @@ module Dispatcher #(
   //update DPDC_ask_IF immediately
   always @(*) begin
     if (!RoBDP_pre_judge || Sys_rst) begin
-      DPDC_ask_IF <= 1;
+      DPDC_ask_IF = 1;
     end else if (Sys_rdy) begin
       if (RSDP_full || LSBDP_full || RoBDP_full || (state == WAITING_INS && DCDP_en)) begin
-        DPDC_ask_IF <= 0;
+        DPDC_ask_IF = 0;
       end else begin
-        DPDC_ask_IF <= 1;
+        DPDC_ask_IF = 1;
       end
     end
   end

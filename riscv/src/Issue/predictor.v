@@ -45,18 +45,16 @@ module Predictor #(
   always @(*) begin
     //attention not considering reset signal     
     if (IFPD_predict_en) begin  //ask for prediction
-      PDIF_predict_result <= pattern_history_table[hash_num_prediction][BHR_prediction][1];
+      PDIF_predict_result = pattern_history_table[hash_num_prediction][BHR_prediction][1];
     end else if (IFPD_feedback_en) begin  //feedback the result of branch instruction
-      BHRs[hash_num_feedback] <= {
-        BHRs[hash_num_feedback][HISTORY_LENGTH-1:1], IFPD_branch_result
-      };  //update BHR
+      BHRs[hash_num_feedback] = {BHRs[hash_num_feedback][HISTORY_LENGTH-1:1], IFPD_branch_result};  //update BHR
       if (IFPD_branch_result == 1) begin
         if (pattern_history_table[hash_num_feedback][BHR_feedback] != 2'b11) begin
-          pattern_history_table[hash_num_feedback][BHR_feedback] <= pattern_history_table[hash_num_feedback][BHR_feedback] + 1;
+          pattern_history_table[hash_num_feedback][BHR_feedback] = pattern_history_table[hash_num_feedback][BHR_feedback] + 1;
         end
       end else begin
         if (pattern_history_table[hash_num_feedback][BHR_feedback] != 2'b00) begin
-          pattern_history_table[hash_num_feedback][BHR_feedback] <= pattern_history_table[hash_num_feedback][BHR_feedback] - 1;
+          pattern_history_table[hash_num_feedback][BHR_feedback] = pattern_history_table[hash_num_feedback][BHR_feedback] - 1;
         end
       end
     end
