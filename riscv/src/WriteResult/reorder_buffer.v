@@ -240,8 +240,10 @@ module ReorderBuffer #(
 
       //Instruction fetcher
       if (CDBRoB_RS_en && opcode[CDBRoB_RS_RoB_index] == jalr) begin
-        RoBIF_jalr_en <= 1;
-        RoBIF_next_pc <= CDBRoB_RS_next_pc;
+        if(!(busy[front] && front_type == BRANCH && state[front] == READY && (pre_result[front] != value[front]))) begin //there is no wrong prediction now
+          RoBIF_jalr_en <= 1;
+          RoBIF_next_pc <= CDBRoB_RS_next_pc;
+        end
       end else begin
         RoBIF_jalr_en <= 0;
       end
@@ -250,7 +252,9 @@ module ReorderBuffer #(
         pre_judge <= pre_result[front] == value[front];
         RoBIF_branch_result <= value[front];
         RoBIF_branch_pc <= pc[front];
-        RoBIF_next_pc <= next_pc[front];
+        if (pre_result[front] != value[front]) begin //only when wrong prediction occurs, send next_pc to IF to avoid conflict with jalr instruction 
+          RoBIF_next_pc <= next_pc[front];
+        end
       end else begin
         RoBIF_branch_en <= 0;
         pre_judge <= 1;
