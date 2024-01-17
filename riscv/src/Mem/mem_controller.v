@@ -52,9 +52,9 @@ module MemController #(
   reg [3 + BLOCK_WIDTH - 1:0] r_byte_num;  //a block has 4*BLOCK_SIZE bytes
   reg [2:0] w_byte_num;  //write byte num
   reg last_serve;  //LSB or ICACHE
-  wire un_io_access;  // 1 if uart buffer is full and address is 0x30000 or 0x30004.
+  wire stop_write;  // 1 if uart buffer is full write to address 0x30000 or 0x30004.
 
-  assign un_io_access = io_buffer_full && (MCRAM_addr == 32'h30000 || MCRAM_addr == 32'h30004);
+  assign stop_write = io_buffer_full && LSBMC_en && LSBMC_wr && (LSBMC_addr == 32'h30000 || LSBMC_addr == 32'h30004);
 
   always @(posedge Sys_clk) begin
     if (Sys_rst) begin
@@ -74,13 +74,13 @@ module MemController #(
         MCLSB_r_en <= 0;
         MCLSB_w_en <= 0;
         MCIC_en <= 0;
-        if (ICMC_en && !MCIC_en && (!LSBMC_en || last_serve == LSB) && !un_io_access) begin  //serve for icache
+        if (ICMC_en && !MCIC_en && (!LSBMC_en || last_serve == LSB)) begin  //serve for icache
           MC_state   <= READ;
           r_byte_num <= 0;
           last_serve <= ICACHE;
           MCRAM_addr <= ICMC_addr;
           MCRAM_wr   <= 0;  //read
-        end else if (LSBMC_en &&((LSBMC_wr && !MCLSB_w_en)||(!LSBMC_wr && !MCLSB_r_en)) && !un_io_access) begin  //serve for LSB
+        end else if (LSBMC_en &&((LSBMC_wr && !MCLSB_w_en)||(!LSBMC_wr && !MCLSB_r_en)) && !stop_write) begin  //serve for LSB
           MC_state   <= LSBMC_wr ? WRITE : READ;
           last_serve <= LSB;
           MCRAM_addr <= LSBMC_addr;
@@ -138,7 +138,7 @@ module MemController #(
             MCLSB_r_en <= 1;
           end
         end
-      end else if (MC_state == WRITE && !io_buffer_full) begin
+      end else if (MC_state == WRITE && !stop_write) begin
         // if (!LSBMC_en) begin
         //   MC_state <= IDLE;
         //   w_byte_num <= 0;
