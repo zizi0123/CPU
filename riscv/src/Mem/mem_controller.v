@@ -52,9 +52,9 @@ module MemController #(
   reg [3 + BLOCK_WIDTH - 1:0] r_byte_num;  //a block has 4*BLOCK_SIZE bytes
   reg [2:0] w_byte_num;  //write byte num
   reg last_serve;  //LSB or ICACHE
-  wire stop_write = 0;  // 1 if uart buffer is full write to address 0x30000 or 0x30004.
+  wire stop_write;  // 1 if uart buffer is full write to address 0x30000 or 0x30004.
 
-  // assign stop_write = io_buffer_full && LSBMC_en && LSBMC_wr && (LSBMC_addr == 32'h30000 || LSBMC_addr == 32'h30004);
+  assign stop_write = io_buffer_full && LSBMC_en && LSBMC_wr && (LSBMC_addr == 32'h30000 || LSBMC_addr == 32'h30004);
 
   always @(posedge Sys_clk) begin
     if (Sys_rst) begin
