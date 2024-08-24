@@ -14,10 +14,4 @@
 ### 框架草图
 # <img src="README.assets/cpu框架.png" width="1000" align=center /> 
 
-### 模块设计
 
-#### Instruction cache
-
-采用 **Direct-mapped** 设计。
-# <img src="README.assets/address.png" width="300" align=center /> 
-index = block address % block numbers，用于在确定 cache 中的块位置；tag 用于比对，确定是否命中。
